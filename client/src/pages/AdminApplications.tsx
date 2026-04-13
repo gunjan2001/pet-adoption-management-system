@@ -1,19 +1,22 @@
-import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import { CheckCircle, XCircle } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
+import api from "@/lib/api/httpClient";
 
 export default function AdminApplications() {
   const { user, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
+
+  const [applications, setApplications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Redirect if not admin
   useEffect(() => {
@@ -22,38 +25,59 @@ export default function AdminApplications() {
     }
   }, [isAuthenticated, user?.role, setLocation]);
 
-  // Queries
-  const { data: applications, isLoading: appsLoading, refetch: refetchApps } = trpc.applications.allApplications.useQuery(
-    {
-      page: 1,
-      limit: 50,
-    },
-    {
-      staleTime: 1000 * 60,
-      enabled: isAuthenticated && user?.role === "admin",
+  // ✅ Fetch applications (REPLACES trpc query)
+  const fetchApplications = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/applications?page=1&limit=50");
+      setApplications(res.data.applications || []);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to fetch applications");
+    } finally {
+      setLoading(false);
     }
-  );
+  };
 
-  // Mutations
-  const approveMutation = trpc.applications.approve.useMutation({
-    onSuccess: () => {
+  useEffect(() => {
+    if (isAuthenticated && user?.role === "admin") {
+      fetchApplications();
+    }
+  }, [isAuthenticated, user?.role]);
+
+  // ✅ Approve (REPLACES mutation)
+  const handleApprove = async (id: string) => {
+    try {
+      setActionLoading(true);
+      await api.post(`/applications/${id}/approve`, {
+        adminNotes: "Application approved",
+      });
       toast.success("Application approved");
-      void refetchApps();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
+      fetchApplications(); // refetch
+    } catch (error: any) {
+      toast.error(error.message || "Failed to approve");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-  const rejectMutation = trpc.applications.reject.useMutation({
-    onSuccess: () => {
+  // ✅ Reject (REPLACES mutation)
+  const handleReject = async (id: string) => {
+    const reason = prompt("Enter rejection reason:");
+    if (!reason) return;
+
+    try {
+      setActionLoading(true);
+      await api.post(`/applications/${id}/reject`, {
+        adminNotes: reason,
+      });
       toast.success("Application rejected");
-      void refetchApps();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
+      fetchApplications(); // refetch
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reject");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   if (!isAuthenticated || user?.role !== "admin") {
     return null;
@@ -76,24 +100,27 @@ export default function AdminApplications() {
     <AdminLayout activeTab="applications">
       <div className="py-8 md:py-12">
         <div className="container">
-          {/* Page Title */}
           <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-black">Adoption Applications</h1>
-            <p className="text-muted mt-2">Review and manage adoption applications</p>
+            <h1 className="text-3xl md:text-4xl font-black">
+              Adoption Applications
+            </h1>
+            <p className="text-muted mt-2">
+              Review and manage adoption applications
+            </p>
           </div>
 
-          {appsLoading ? (
+          {loading ? (
             <div className="space-y-4">
               {Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-32 w-full" />
               ))}
             </div>
-          ) : applications?.applications && applications.applications.length > 0 ? (
+          ) : applications.length > 0 ? (
             <div className="space-y-4">
-              {applications.applications.map((app) => (
-                <Card key={app.id} className="p-6 border border-border hover:border-accent/50 transition-colors">
+              {applications.map((app) => (
+                <Card key={app.id} className="p-6 border border-border">
                   <div className="space-y-4">
-                    <div className="flex items-start justify-between">
+                    <div className="flex justify-between">
                       <div>
                         <h3 className="text-lg font-bold">{app.fullName}</h3>
                         <p className="text-sm text-muted">
@@ -120,48 +147,25 @@ export default function AdminApplications() {
                       </div>
                     </div>
 
-                    {app.reason && (
-                      <div>
-                        <p className="text-sm text-muted mb-1">Why they want to adopt</p>
-                        <p className="text-sm">{app.reason}</p>
-                      </div>
-                    )}
-
-                    {app.experience && (
-                      <div>
-                        <p className="text-sm text-muted mb-1">Pet Experience</p>
-                        <p className="text-sm">{app.experience}</p>
-                      </div>
-                    )}
+                    {app.reason && <p>{app.reason}</p>}
+                    {app.experience && <p>{app.experience}</p>}
 
                     {app.status === "pending" && (
-                      <div className="flex gap-3 pt-4 border-t border-border">
+                      <div className="flex gap-3 pt-4 border-t">
                         <Button
-                          onClick={() =>
-                            approveMutation.mutate({
-                              id: app.id,
-                              adminNotes: "Application approved",
-                            })
-                          }
-                          disabled={approveMutation.isPending}
-                          className="flex-1 bg-green-600 text-white hover:bg-green-700 flex items-center gap-2"
+                          onClick={() => handleApprove(app.id)}
+                          disabled={actionLoading}
+                          className="flex-1 bg-green-600 text-white"
                         >
                           <CheckCircle className="w-4 h-4" />
                           Approve
                         </Button>
+
                         <Button
-                          onClick={() => {
-                            const reason = prompt("Enter rejection reason:");
-                            if (reason) {
-                              rejectMutation.mutate({
-                                id: app.id,
-                                adminNotes: reason,
-                              });
-                            }
-                          }}
-                          disabled={rejectMutation.isPending}
+                          onClick={() => handleReject(app.id)}
+                          disabled={actionLoading}
                           variant="destructive"
-                          className="flex-1 flex items-center gap-2"
+                          className="flex-1"
                         >
                           <XCircle className="w-4 h-4" />
                           Reject
@@ -173,8 +177,8 @@ export default function AdminApplications() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 bg-card border border-border rounded-lg">
-              <p className="text-lg text-muted">No applications found</p>
+            <div className="text-center py-12">
+              <p>No applications found</p>
             </div>
           )}
         </div>

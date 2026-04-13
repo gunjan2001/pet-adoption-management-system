@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, Link } from 'wouter';
-import { RegisterForm } from '@/components/RegisterForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import RegisterForm from '@/components/RegisterForm';
 
 export const RegisterPage: React.FC = () => {
   const [, setLocation] = useLocation();
@@ -30,8 +30,8 @@ export const RegisterPage: React.FC = () => {
         </CardHeader>
         <CardContent>
           <RegisterForm
-            onSuccess={handleRegisterSuccess}
-            onError={handleRegisterError}
+            // onSuccess={handleRegisterSuccess}
+            // onError={handleRegisterError}
           />
 
           <div className="mt-4 text-center text-sm">

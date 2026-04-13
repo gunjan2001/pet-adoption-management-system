@@ -1,82 +1,91 @@
-import { useRoute } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+// src/pages/PetDetail.tsx
 import { useState } from "react";
+import { useRoute, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
-import { useLocation } from "wouter";
+import { usePet } from "@/hooks/usePets";
+import { adoptionsApi } from "@/lib/api/adoptions.api";
+import { getErrorMessage } from "@/lib/errorHandler";
+import { useAuth } from "@/_core/hooks/useAuth";
 
-const adoptionApplicationSchema = z.object({
-  fullName: z.string().min(2, "Full name is required"),
-  email: z.string().email("Valid email is required"),
-  phone: z.string().min(10, "Valid phone number is required"),
-  address: z.string().min(5, "Address is required"),
-  homeType: z.string().optional(),
-  hasYard: z.boolean().optional(),
-  otherPets: z.string().optional(),
-  experience: z.string().min(10, "Please describe your pet experience"),
-  reason: z.string().min(20, "Please explain why you want to adopt"),
+// ── Zod schema — matches backend validation exactly ───────────────────────────
+const applicationSchema = z.object({
+  fullName:   z.string().min(2,  "Full name is required"),
+  email:      z.string().email("Valid email is required"),
+  phone:      z.string().min(7,  "Valid phone number is required"),
+  address:    z.string().min(5,  "Address is required"),
+  homeType:   z.enum(["house", "apartment", "condo", "townhouse", "other"]).optional(),
+  hasYard:    z.boolean().optional(),
+  otherPets:  z.string().optional(),
+  experience: z.string().optional(),
+  reason:     z.string().min(20, "Please explain why you want to adopt (min 20 chars)"),
 });
 
-type AdoptionApplicationFormData = z.infer<typeof adoptionApplicationSchema>;
+type ApplicationForm = z.infer<typeof applicationSchema>;
+
+// ── Shared Tailwind class fragments ───────────────────────────────────────────
+const inputBase =
+  "w-full px-3 py-2 border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-colors";
+const inputNormal  = `${inputBase} border-border`;
+const inputError   = `${inputBase} border-red-500 focus:ring-red-400`;
+const labelClass   = "block text-sm font-medium mb-1";
+const errorClass   = "text-red-500 text-xs mt-1";
 
 export default function PetDetail() {
-  const [, params] = useRoute("/pets/:id");
+  const [, params]      = useRoute("/pets/:id");
   const [, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
-  const petId = params?.id ? parseInt(params.id) : 0;
 
-  const { data: pet, isLoading: petLoading } = trpc.pets.detail.useQuery({ id: petId });
-  const submitApplication = trpc.applications.submit.useMutation();
-  const [showForm, setShowForm] = useState(false);
+  const petId = params?.id ? parseInt(params.id, 10) : undefined;
+  const { pet, isLoading, error } = usePet(petId);
+
+  const [showForm,  setShowForm]  = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm<AdoptionApplicationFormData>({
-    resolver: zodResolver(adoptionApplicationSchema),
+  } = useForm<ApplicationForm>({
+    resolver: zodResolver(applicationSchema),
     defaultValues: {
-      fullName: user?.name || "",
-      email: user?.email || "",
-      phone: user?.phone || "",
-      address: user?.address || "",
+      fullName:  user?.name    ?? "",
+      email:     user?.email   ?? "",
+      phone:     user?.phone   ?? "",
+      address:   user?.address ?? "",
     },
   });
 
-  const onSubmit = async (data: AdoptionApplicationFormData) => {
+  const onSubmit = async (data: ApplicationForm) => {
+    if (!petId) return;
     try {
-      await submitApplication.mutateAsync({
-        petId,
-        ...data,
-      });
+      await adoptionsApi.submit({ petId, ...data });
       toast.success("Application submitted successfully!");
       reset();
       setShowForm(false);
-      setLocation("/dashboard");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to submit application");
+      setSubmitted(true);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     }
   };
 
-  if (petLoading) {
+  // ── Loading skeleton ────────────────────────────────────────────────────────
+  if (isLoading) {
     return (
       <div className="min-h-screen py-12 md:py-20">
-        <div className="container">
+        <div className="container mx-auto px-4 max-w-6xl">
           <div className="grid md:grid-cols-2 gap-12">
-            <Skeleton className="h-96 w-full" />
-            <div className="space-y-4">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-full" />
+            <div className="aspect-square w-full rounded-xl bg-muted animate-pulse" />
+            <div className="space-y-4 pt-2">
+              <div className="h-10 w-3/4 rounded bg-muted animate-pulse" />
+              <div className="h-5  w-1/2 rounded bg-muted animate-pulse" />
+              <div className="h-4  w-full rounded bg-muted animate-pulse" />
+              <div className="h-4  w-full rounded bg-muted animate-pulse" />
+              <div className="h-4  w-2/3 rounded bg-muted animate-pulse" />
             </div>
           </div>
         </div>
@@ -84,272 +93,290 @@ export default function PetDetail() {
     );
   }
 
-  if (!pet) {
+  // ── Error / not found ───────────────────────────────────────────────────────
+  if (error || !pet) {
     return (
       <div className="min-h-screen py-12 md:py-20">
-        <div className="container text-center">
-          <h1 className="text-3xl font-bold mb-4">Pet not found</h1>
-          <Button asChild className="bg-accent text-accent-foreground">
-            <a href="/pets">Back to Pets</a>
-          </Button>
+        <div className="container mx-auto px-4 max-w-6xl text-center">
+          <p className="text-5xl mb-4">🐾</p>
+          <h1 className="text-3xl font-bold mb-4">{error ?? "Pet not found"}</h1>
+          <button
+            onClick={() => setLocation("/pets")}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Pets
+          </button>
         </div>
       </div>
     );
   }
 
-  const isAvailable = pet.status === "available";
+  const isAvailable  = pet.status === "available";
+  const statusLabel  = pet.status === "available" ? "Available"
+                     : pet.status === "pending"   ? "Pending"
+                     : "Adopted";
+  const statusColor  = pet.status === "available" ? "bg-green-500"
+                     : pet.status === "pending"   ? "bg-yellow-500"
+                     : "bg-gray-400";
 
   return (
     <div className="min-h-screen py-12 md:py-20">
-      <div className="container">
-        {/* Back Button */}
-        <Button
-          asChild
-          variant="ghost"
-          className="mb-8 flex items-center gap-2"
+      <div className="container mx-auto px-4 max-w-6xl">
+
+        {/* ── Back button ─────────────────────────────────────────────────── */}
+        <button
+          onClick={() => setLocation("/pets")}
+          className="inline-flex items-center gap-2 mb-8 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          <a href="/pets" className="flex items-center gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Pets
-          </a>
-        </Button>
+          <ArrowLeft className="w-4 h-4" />
+          Back to Pets
+        </button>
 
         <div className="grid md:grid-cols-2 gap-12">
-          {/* Pet Image */}
-          <div className="space-y-4">
-            <div className="relative w-full aspect-square bg-muted/20 rounded-lg overflow-hidden">
-              {pet.imageUrl ? (
-                <img
-                  src={pet.imageUrl}
-                  alt={pet.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-8xl">
-                  🐾
-                </div>
-              )}
-              {/* Status Badge */}
-              <div className={`absolute top-4 right-4 px-4 py-2 rounded-full text-sm font-semibold text-white ${
-                isAvailable ? "bg-green-500" : pet.status === "pending" ? "bg-yellow-500" : "bg-gray-500"
-              }`}>
-                {isAvailable ? "Available" : pet.status === "pending" ? "Pending" : "Adopted"}
+
+          {/* ── Pet image ─────────────────────────────────────────────────── */}
+          <div className="relative aspect-square w-full bg-muted/20 rounded-xl overflow-hidden">
+            {pet.imageUrl ? (
+              <img
+                src={pet.imageUrl}
+                alt={pet.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-8xl">
+                🐾
               </div>
-            </div>
+            )}
+            <span className={`absolute top-4 right-4 px-4 py-1.5 rounded-full text-sm font-semibold text-white ${statusColor}`}>
+              {statusLabel}
+            </span>
           </div>
 
-          {/* Pet Info & Application Form */}
-          <div className="space-y-8">
-            {/* Pet Information */}
-            <div className="space-y-4">
-              <div>
-                <h1 className="text-4xl md:text-5xl font-black mb-2">{pet.name}</h1>
-                <p className="text-lg text-muted">{pet.breed || pet.species}</p>
-              </div>
+          {/* ── Pet info + action ──────────────────────────────────────────── */}
+          <div className="space-y-6">
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-card border border-border rounded-lg p-4">
-                  <p className="text-sm text-muted mb-1">Age</p>
-                  <p className="font-semibold">
-                    {pet.age ? `${Math.floor(pet.age / 12)} years` : "Unknown"}
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-4">
-                  <p className="text-sm text-muted mb-1">Gender</p>
-                  <p className="font-semibold capitalize">{pet.gender || "Unknown"}</p>
-                </div>
-              </div>
+            {/* Name + breed */}
+            <div>
+              <h1 className="text-4xl md:text-5xl font-black mb-1">{pet.name}</h1>
+              <p className="text-lg text-muted-foreground capitalize">
+                {pet.breed || pet.species}
+              </p>
+            </div>
 
+            {/* Stat cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-xs text-muted-foreground mb-1">Age</p>
+                <p className="font-semibold">
+                  {pet.age != null
+                    ? `${Math.floor(pet.age / 12)} yr${Math.floor(pet.age / 12) !== 1 ? "s" : ""} ${pet.age % 12}m`
+                    : "Unknown"}
+                </p>
+              </div>
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-xs text-muted-foreground mb-1">Gender</p>
+                <p className="font-semibold capitalize">{pet.gender ?? "Unknown"}</p>
+              </div>
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-xs text-muted-foreground mb-1">Species</p>
+                <p className="font-semibold capitalize">{pet.species}</p>
+              </div>
               {pet.adoptionFee && (
-                <div className="bg-card border border-border rounded-lg p-4">
-                  <p className="text-sm text-muted mb-1">Adoption Fee</p>
-                  <p className="text-2xl font-bold text-accent">${pet.adoptionFee}</p>
-                </div>
-              )}
-
-              {pet.description && (
-                <div>
-                  <h3 className="font-bold mb-2">About {pet.name}</h3>
-                  <p className="text-muted leading-relaxed">{pet.description}</p>
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Adoption Fee</p>
+                  <p className="text-xl font-bold text-primary">${pet.adoptionFee}</p>
                 </div>
               )}
             </div>
 
-            {/* Application Form */}
-            {isAvailable ? (
-              <>
-                {!showForm ? (
-                  <Button
-                    onClick={() => {
-                      if (!isAuthenticated) {
-                        setLocation("/login")
-                      } else {
-                        setShowForm(true);
-                      }
-                    }}
-                    className="w-full bg-accent text-accent-foreground hover:opacity-90 text-base font-semibold py-6"
-                  >
-                    {isAuthenticated ? "Apply to Adopt" : "Login to Apply"}
-                  </Button>
-                ) : (
-                  <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-                    <h3 className="font-bold text-lg">Adoption Application</h3>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                      {/* Full Name */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Full Name</label>
-                        <Input
-                          {...register("fullName")}
-                          placeholder="Your full name"
-                          className={errors.fullName ? "border-red-500" : ""}
-                        />
-                        {errors.fullName && (
-                          <p className="text-red-500 text-sm mt-1">{errors.fullName.message}</p>
-                        )}
-                      </div>
+            {/* Description */}
+            {pet.description && (
+              <div>
+                <h3 className="font-bold mb-2">About {pet.name}</h3>
+                <p className="text-muted-foreground leading-relaxed">{pet.description}</p>
+              </div>
+            )}
 
-                      {/* Email */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Email</label>
-                        <Input
-                          {...register("email")}
-                          type="email"
-                          placeholder="your@email.com"
-                          className={errors.email ? "border-red-500" : ""}
-                        />
-                        {errors.email && (
-                          <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
-                        )}
-                      </div>
+            {/* ── CTA / Form toggle ──────────────────────────────────────── */}
+            {submitted ? (
+              <div className="rounded-xl bg-green-50 border border-green-200 p-5 text-green-800">
+                <p className="font-semibold mb-1">✅ Application submitted!</p>
+                <p className="text-sm">We'll review your application and be in touch soon.</p>
+                <button
+                  onClick={() => setLocation("/dashboard")}
+                  className="mt-3 text-sm font-medium underline hover:no-underline"
+                >
+                  View my applications →
+                </button>
+              </div>
 
-                      {/* Phone */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Phone</label>
-                        <Input
-                          {...register("phone")}
-                          placeholder="(555) 123-4567"
-                          className={errors.phone ? "border-red-500" : ""}
-                        />
-                        {errors.phone && (
-                          <p className="text-red-500 text-sm mt-1">{errors.phone.message}</p>
-                        )}
-                      </div>
-
-                      {/* Address */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Address</label>
-                        <Input
-                          {...register("address")}
-                          placeholder="Your address"
-                          className={errors.address ? "border-red-500" : ""}
-                        />
-                        {errors.address && (
-                          <p className="text-red-500 text-sm mt-1">{errors.address.message}</p>
-                        )}
-                      </div>
-
-                      {/* Home Type */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Home Type</label>
-                        <select
-                          {...register("homeType")}
-                          className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                        >
-                          <option value="">Select...</option>
-                          <option value="house">House</option>
-                          <option value="apartment">Apartment</option>
-                          <option value="condo">Condo</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-
-                      {/* Has Yard */}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          {...register("hasYard")}
-                          id="hasYard"
-                          className="w-4 h-4 rounded border-border"
-                        />
-                        <label htmlFor="hasYard" className="text-sm font-medium">
-                          I have a yard
-                        </label>
-                      </div>
-
-                      {/* Other Pets */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Other Pets</label>
-                        <textarea
-                          {...register("otherPets")}
-                          placeholder="Do you have other pets? Describe them..."
-                          rows={2}
-                          className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                        />
-                      </div>
-
-                      {/* Experience */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Pet Experience</label>
-                        <textarea
-                          {...register("experience")}
-                          placeholder="Tell us about your experience with pets..."
-                          rows={3}
-                          className={`w-full px-3 py-2 border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent ${
-                            errors.experience ? "border-red-500" : "border-border"
-                          }`}
-                        />
-                        {errors.experience && (
-                          <p className="text-red-500 text-sm mt-1">{errors.experience.message}</p>
-                        )}
-                      </div>
-
-                      {/* Reason */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Why do you want to adopt?</label>
-                        <textarea
-                          {...register("reason")}
-                          placeholder="Tell us why you want to adopt this pet..."
-                          rows={3}
-                          className={`w-full px-3 py-2 border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent ${
-                            errors.reason ? "border-red-500" : "border-border"
-                          }`}
-                        />
-                        {errors.reason && (
-                          <p className="text-red-500 text-sm mt-1">{errors.reason.message}</p>
-                        )}
-                      </div>
-
-                      {/* Buttons */}
-                      <div className="flex gap-3 pt-4">
-                        <Button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className="flex-1 bg-accent text-accent-foreground hover:opacity-90"
-                        >
-                          {isSubmitting ? "Submitting..." : "Submit Application"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setShowForm(false)}
-                          className="flex-1"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </form>
-                  </div>
-                )}
-              </>
+            ) : isAvailable ? (
+              !showForm ? (
+                <button
+                  onClick={() => isAuthenticated ? setShowForm(true) : setLocation("/login")}
+                  className="w-full py-4 rounded-xl bg-primary text-primary-foreground text-base font-semibold hover:opacity-90 transition-opacity"
+                >
+                  {isAuthenticated ? "Apply to Adopt" : "Login to Apply"}
+                </button>
+              ) : null /* form rendered below outside the grid cell */
             ) : (
-              <div className="bg-card border border-border rounded-lg p-6 text-center">
-                <p className="text-lg font-semibold text-muted">
-                  {pet.status === "adopted" ? "This pet has been adopted" : "This pet is no longer available"}
+              <div className="rounded-xl bg-card border border-border p-5 text-center">
+                <p className="text-muted-foreground font-medium">
+                  {pet.status === "adopted"
+                    ? "This pet has already been adopted 🎉"
+                    : "This pet is currently pending adoption"}
                 </p>
               </div>
             )}
           </div>
         </div>
+
+        {/* ── Adoption Application Form (full-width below grid) ────────────── */}
+        {showForm && isAvailable && !submitted && (
+          <div className="mt-12 bg-card border border-border rounded-xl p-6 md:p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold">Adoption Application for {pet.name}</h3>
+              <button
+                onClick={() => setShowForm(false)}
+                className="text-muted-foreground hover:text-foreground text-sm transition-colors"
+              >
+                ✕ Cancel
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+
+              {/* Row 1 — Name + Email */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Full Name *</label>
+                  <input
+                    {...register("fullName")}
+                    placeholder="Jane Doe"
+                    className={errors.fullName ? inputError : inputNormal}
+                  />
+                  {errors.fullName && <p className={errorClass}>{errors.fullName.message}</p>}
+                </div>
+                <div>
+                  <label className={labelClass}>Email *</label>
+                  <input
+                    {...register("email")}
+                    type="email"
+                    placeholder="you@example.com"
+                    className={errors.email ? inputError : inputNormal}
+                  />
+                  {errors.email && <p className={errorClass}>{errors.email.message}</p>}
+                </div>
+              </div>
+
+              {/* Row 2 — Phone + Address */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Phone *</label>
+                  <input
+                    {...register("phone")}
+                    placeholder="+1 555 000 0000"
+                    className={errors.phone ? inputError : inputNormal}
+                  />
+                  {errors.phone && <p className={errorClass}>{errors.phone.message}</p>}
+                </div>
+                <div>
+                  <label className={labelClass}>Address *</label>
+                  <input
+                    {...register("address")}
+                    placeholder="123 Main St, City"
+                    className={errors.address ? inputError : inputNormal}
+                  />
+                  {errors.address && <p className={errorClass}>{errors.address.message}</p>}
+                </div>
+              </div>
+
+              {/* Row 3 — Home type + Yard */}
+              <div className="grid md:grid-cols-2 gap-4 items-end">
+                <div>
+                  <label className={labelClass}>Home Type</label>
+                  <select
+                    {...register("homeType")}
+                    className={inputNormal}
+                  >
+                    <option value="">Select…</option>
+                    <option value="house">House</option>
+                    <option value="apartment">Apartment</option>
+                    <option value="condo">Condo</option>
+                    <option value="townhouse">Townhouse</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-3 pb-2">
+                  <input
+                    type="checkbox"
+                    {...register("hasYard")}
+                    id="hasYard"
+                    className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
+                  />
+                  <label htmlFor="hasYard" className="text-sm font-medium cursor-pointer">
+                    I have a yard or outdoor space
+                  </label>
+                </div>
+              </div>
+
+              {/* Other pets */}
+              <div>
+                <label className={labelClass}>Other Pets</label>
+                <textarea
+                  {...register("otherPets")}
+                  rows={2}
+                  placeholder="Do you have other pets? Describe them briefly…"
+                  className={inputNormal}
+                />
+              </div>
+
+              {/* Experience */}
+              <div>
+                <label className={labelClass}>Pet Ownership Experience</label>
+                <textarea
+                  {...register("experience")}
+                  rows={3}
+                  placeholder="Tell us about your experience caring for pets…"
+                  className={errors.experience ? inputError : inputNormal}
+                />
+                {errors.experience && <p className={errorClass}>{errors.experience.message}</p>}
+              </div>
+
+              {/* Reason */}
+              <div>
+                <label className={labelClass}>Why do you want to adopt {pet.name}? *</label>
+                <textarea
+                  {...register("reason")}
+                  rows={4}
+                  placeholder="Please share why you'd like to adopt this pet (min 20 characters)…"
+                  className={errors.reason ? inputError : inputNormal}
+                />
+                {errors.reason && <p className={errorClass}>{errors.reason.message}</p>}
+              </div>
+
+              {/* Submit row */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                >
+                  {isSubmitting ? "Submitting…" : "Submit Application"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="flex-1 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );

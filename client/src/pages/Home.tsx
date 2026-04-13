@@ -5,7 +5,7 @@ import { Heart, Users, Zap } from "lucide-react";
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
-
+  
   return (
     <div className="min-h-screen">
       {/* Hero Section */}

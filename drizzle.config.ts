@@ -1,15 +1,17 @@
+// drizzle.config.ts  (stays at root — references server schema + root migrations)
 import { defineConfig } from "drizzle-kit";
+import * as dotenv from "dotenv";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL is required to run drizzle commands");
-}
+// Load server .env so DATABASE_URL is available when running from root
+dotenv.config({ path: "./server/.env" });
 
 export default defineConfig({
-  schema: "./drizzle/schema.ts",
-  out: "./drizzle",
+  schema: "./server/src/db/schema.ts",
+  out: "./drizzle/migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: connectionString,
+    url: process.env.DATABASE_URL!,
   },
+  verbose: true,
+  strict: true,
 });

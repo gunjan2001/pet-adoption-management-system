@@ -1,212 +1,239 @@
+// src/pages/PetListing.tsx
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { trpc } from "@/lib/trpc";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { usePets } from "@/hooks/usePets";
+import type { PetStatus } from "@/types";
+
+const LIMIT = 12;
 
 export default function PetListing() {
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  // ── Backend filters (sent to API) ──────────────────────────────────────────
   const [species, setSpecies] = useState("");
-  const [breed, setBreed] = useState("");
-  const [minAge, setMinAge] = useState(0);
-  const [maxAge, setMaxAge] = useState(20);
-  const [status, setStatus] = useState<"available" | "adopted" | "pending">("available");
-  const limit = 12;
+  const [status,  setStatus]  = useState<PetStatus | "">( "available");
 
-  // Get all pets for breed extraction (only when no breed filter is active)
-  const { data: allPets } = trpc.pets.list.useQuery({
-    page: 1,
-    limit: 1000,
-    species,
-    status,
+  // ── Client-side filters (applied after fetch) ──────────────────────────────
+  const [search, setSearch] = useState("");
+  const [breed,  setBreed]  = useState("");
+  const [minAge, setMinAge] = useState(0);   // in years
+  const [maxAge, setMaxAge] = useState(20);  // in years
+
+  // ── Pagination ─────────────────────────────────────────────────────────────
+  const [page, setPage] = useState(1);
+
+  // ── Fetch all matching pets from backend (breed/age/search = client-side) ──
+  // High limit so client-side filters + pagination work on the full set.
+  const { pets: rawPets, isLoading, error } = usePets({
+    limit:   10,
+    page:    1,
+    species: species  || undefined,
+    // status:  (status  || undefined) as PetStatus | undefined,
   });
 
-  const { data, isLoading } = trpc.pets.list.useQuery({
-    page,
-    limit,
-    search,
-    species,
-    breed,
-    minAge,
-    maxAge,
-    status,
-  });
-
-  // Extract unique breeds from all pets
+  // ── Extract unique breeds from fetched pets ────────────────────────────────
   const breeds = useMemo(() => {
-    if (!allPets?.pets) return [];
-    const uniqueBreeds = new Set(allPets.pets.map(p => p.breed).filter(Boolean));
-    return Array.from(uniqueBreeds).sort();
-  }, [allPets?.pets]);
+    const set = new Set(rawPets.map((p) => p.breed).filter(Boolean) as string[]);
+    return Array.from(set).sort();
+  }, [rawPets]);
 
-  // Use filtered data directly from backend
-  const filteredPets = useMemo(() => {
-    if (!data?.pets) return [];
-    return data.pets;
-  }, [data?.pets, breed, minAge, maxAge]);
+  // ── Apply client-side filters ─────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    const q         = search.toLowerCase();
+    const minMonths = minAge * 12;
+    const maxMonths = maxAge * 12;
 
-  const totalPages = data?.totalPages || 1;
+    return rawPets.filter((pet) => {
+      if (q     && !pet.name.toLowerCase().includes(q))                      return false;
+      if (breed && pet.breed !== breed)                                       return false;
+      if (pet.age !== null && pet.age !== undefined) {
+        if (pet.age < minMonths || pet.age > maxMonths)                      return false;
+      }
+      return true;
+    });
+  }, [rawPets, search, breed, minAge, maxAge]);
 
-  const handlePreviousPage = () => {
-    if (page > 1) setPage(page - 1);
-  };
+  // ── Client-side pagination ────────────────────────────────────────────────
+  const totalPages  = Math.max(1, Math.ceil(filtered.length / LIMIT));
+  const safePage    = Math.min(page, totalPages);
+  const paginated   = filtered.slice((safePage - 1) * LIMIT, safePage * LIMIT);
 
-  const handleNextPage = () => {
-    if (page < totalPages) setPage(page + 1);
-  };
+  // Reset to page 1 whenever filters change
+  const reset = () => setPage(1);
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value);
-    setPage(1);
-  };
+  // ── Page numbers to show (ellipsis pattern) ───────────────────────────────
+  const pageNumbers = useMemo(() => {
+    const nums: (number | "…")[] = [];
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || Math.abs(i - safePage) <= 1) {
+        nums.push(i);
+      } else if (nums[nums.length - 1] !== "…") {
+        nums.push("…");
+      }
+    }
+    return nums;
+  }, [totalPages, safePage]);
 
-  const handleSpeciesChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSpecies(e.target.value);
-    setBreed(""); // Reset breed when species changes
-    setPage(1);
-  };
-
-  const handleBreedChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setBreed(e.target.value);
-    setPage(1);
-  };
-
-  const handleMinAgeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || 0;
-    setMinAge(Math.min(value, maxAge));
-    setPage(1);
-  };
-
-  const handleMaxAgeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || 20;
-    setMaxAge(Math.max(value, minAge));
-    setPage(1);
-  };
+  // ── Status badge colour ───────────────────────────────────────────────────
+  const statusBadge = (s: PetStatus) =>
+    s === "available"
+      ? "bg-green-500 text-white"
+      : s === "pending"
+      ? "bg-yellow-500 text-white"
+      : "bg-gray-400 text-white";
 
   return (
     <div className="min-h-screen py-12 md:py-20">
-      <div className="container">
-        {/* Header */}
+      <div className="container mx-auto px-4 max-w-7xl">
+
+        {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="mb-12">
           <h1 className="text-4xl md:text-5xl font-black mb-4">Find Your Perfect Pet</h1>
-          <p className="text-lg text-muted">Browse our available pets and start your adoption journey</p>
+          <p className="text-lg text-muted-foreground">
+            Browse our available pets and start your adoption journey
+          </p>
         </div>
 
-        {/* Filters */}
-        <div className="bg-card border border-border rounded-lg p-6 mb-12">
-          <div className="space-y-4">
-            {/* First Row: Search and Species */}
-            <div className="grid md:grid-cols-2 gap-4">
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted pointer-events-none" />
-                <Input
-                  type="text"
-                  placeholder="Search by name..."
-                  value={search}
-                  onChange={handleSearch}
-                  className="pl-10"
-                />
-              </div>
+        {/* ── Filters ─────────────────────────────────────────────────────── */}
+        <div className="bg-card border border-border rounded-xl p-6 mb-12 space-y-4">
 
-              {/* Species Filter */}
-              <select
-                value={species}
-                onChange={handleSpeciesChange}
-                className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="">All Species</option>
-                <option value="dog">Dogs</option>
-                <option value="cat">Cats</option>
-                <option value="rabbit">Rabbits</option>
-                <option value="bird">Birds</option>
-                <option value="other">Other</option>
-              </select>
+          {/* Row 1 — Search + Species */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by name…"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); reset(); }}
+                className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
             </div>
 
-            {/* Second Row: Breed and Status */}
-            <div className="grid md:grid-cols-2 gap-4">
-              {/* Breed Filter */}
-              <select
-                value={breed}
-                onChange={handleBreedChange}
-                className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="">All Breeds</option>
-                {breeds.map((b) => (
-                  <option key={b || "unknown"} value={b || ""}>
-                    {b || "Unknown"}
-                  </option>
-                ))}
-              </select>
+            <select
+              value={species}
+              onChange={(e) => { setSpecies(e.target.value); setBreed(""); reset(); }}
+              className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">All Species</option>
+              <option value="dog">Dogs</option>
+              <option value="cat">Cats</option>
+              <option value="rabbit">Rabbits</option>
+              <option value="bird">Birds</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
 
-              {/* Status Filter */}
-              <select
-                value={status}
+          {/* Row 2 — Breed + Status */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <select
+              value={breed}
+              onChange={(e) => { setBreed(e.target.value); reset(); }}
+              className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">All Breeds</option>
+              {breeds.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+
+            <select
+              value={status}
+              onChange={(e) => { setStatus(e.target.value as PetStatus | ""); reset(); }}
+              className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">All Statuses</option>
+              <option value="available">Available</option>
+              <option value="pending">Pending</option>
+              <option value="adopted">Adopted</option>
+            </select>
+          </div>
+
+          {/* Row 3 — Age range (in years) */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Min Age (years)</label>
+              <input
+                type="number"
+                min={0}
+                max={20}
+                value={minAge}
                 onChange={(e) => {
-                  setStatus(e.target.value as "available" | "adopted" | "pending");
-                  setPage(1);
+                  const v = Math.min(Number(e.target.value) || 0, maxAge);
+                  setMinAge(v);
+                  reset();
                 }}
-                className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="available">Available</option>
-                <option value="pending">Pending</option>
-                <option value="adopted">Adopted</option>
-              </select>
+                className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
             </div>
-
-            {/* Third Row: Age Range */}
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Min Age (years)</label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="20"
-                  value={minAge}
-                  onChange={handleMinAgeChange}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Max Age (years)</label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="20"
-                  value={maxAge}
-                  onChange={handleMaxAgeChange}
-                  className="w-full"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Max Age (years)</label>
+              <input
+                type="number"
+                min={0}
+                max={20}
+                value={maxAge}
+                onChange={(e) => {
+                  const v = Math.max(Number(e.target.value) || 20, minAge);
+                  setMaxAge(v);
+                  reset();
+                }}
+                className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
             </div>
           </div>
+
+          {/* Active filter count */}
+          {filtered.length !== rawPets.length && (
+            <p className="text-sm text-muted-foreground">
+              Showing <span className="font-semibold text-foreground">{filtered.length}</span> of{" "}
+              {rawPets.length} pets
+            </p>
+          )}
         </div>
 
-        {/* Pet Grid */}
+        {/* ── Pet Grid ────────────────────────────────────────────────────── */}
         {isLoading ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-card border border-border rounded-lg overflow-hidden">
-                <Skeleton className="w-full h-48" />
+              <div key={i} className="bg-card border border-border rounded-xl overflow-hidden animate-pulse">
+                <div className="w-full h-48 bg-muted" />
                 <div className="p-4 space-y-3">
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                  <Skeleton className="h-4 w-full" />
+                  <div className="h-5 w-3/4 bg-muted rounded" />
+                  <div className="h-4 w-1/2 bg-muted rounded" />
+                  <div className="h-4 w-full bg-muted rounded" />
+                  <div className="h-9 w-full bg-muted rounded" />
                 </div>
               </div>
             ))}
           </div>
-        ) : filteredPets && filteredPets.length > 0 ? (
+
+        ) : error ? (
+          <div className="text-center py-16">
+            <p className="text-destructive text-lg mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+            >
+              Try again
+            </button>
+          </div>
+
+        ) : paginated.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-5xl mb-4">🐾</p>
+            <p className="text-lg text-muted-foreground">
+              No pets found. Try adjusting your filters.
+            </p>
+          </div>
+
+        ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {filteredPets.map((pet) => (
+            {paginated.map((pet) => (
               <Link key={pet.id} href={`/pets/${pet.id}`}>
-                <a className="group bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg hover:border-accent transition-all duration-300">
-                  {/* Pet Image */}
-                  <div className="relative w-full h-48 bg-muted/20 overflow-hidden">
+                <div className="group bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg hover:border-primary transition-all duration-300 cursor-pointer h-full flex flex-col">
+
+                  {/* Image */}
+                  <div className="relative w-full h-48 bg-muted/30 overflow-hidden flex-shrink-0">
                     {pet.imageUrl ? (
                       <img
                         src={pet.imageUrl}
@@ -214,123 +241,106 @@ export default function PetListing() {
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-4xl">
+                      <div className="w-full h-full flex items-center justify-center text-5xl">
                         🐾
                       </div>
                     )}
-                    {/* Status Badge */}
-                    <div className="absolute top-3 right-3 bg-accent text-accent-foreground px-3 py-1 rounded-full text-sm font-semibold">
-                      {pet.status === "available" ? "Available" : pet.status === "pending" ? "Pending" : "Adopted"}
-                    </div>
+                    {/* Status badge */}
+                    <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold ${statusBadge(pet.status)}`}>
+                      {pet?.status ? pet.status.charAt(0).toUpperCase() + pet.status.slice(1) : ""}
+                    </span>
                   </div>
 
-                  {/* Pet Info */}
-                  <div className="p-4 space-y-3">
+                  {/* Info */}
+                  <div className="p-4 flex flex-col flex-1 space-y-3">
                     <div>
-                      <h3 className="text-lg font-bold text-foreground group-hover:text-accent transition-colors">
+                      <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
                         {pet.name}
                       </h3>
-                      <p className="text-sm text-muted">
+                      <p className="text-sm text-muted-foreground capitalize">
                         {pet.breed || pet.species}
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted">
-                        {pet.age ? `${Math.floor(pet.age / 12)} years old` : "Age unknown"}
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>
+                        {pet.age != null
+                          ? `${Math.floor(pet.age / 12)} yr${Math.floor(pet.age / 12) !== 1 ? "s" : ""} ${pet.age % 12}m`
+                          : "Age unknown"}
                       </span>
-                      <span className="text-muted capitalize">{pet.gender}</span>
+                      <span className="capitalize">{pet.gender ?? "—"}</span>
                     </div>
 
                     {pet.description && (
-                      <p className="text-sm text-muted line-clamp-2">
+                      <p className="text-sm text-muted-foreground line-clamp-2 flex-1">
                         {pet.description}
                       </p>
                     )}
 
-                    <Button
-                      asChild
-                      className="w-full bg-accent text-accent-foreground hover:opacity-90"
-                    >
-                      <a>View Details</a>
-                    </Button>
+                    {pet.adoptionFee && (
+                      <p className="text-sm font-semibold text-foreground">
+                        Fee: ${pet.adoptionFee}
+                      </p>
+                    )}
+
+                    <div className="pt-1">
+                      <span className="block w-full text-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold group-hover:opacity-90 transition-opacity">
+                        View Details
+                      </span>
+                    </div>
                   </div>
-                </a>
+                </div>
               </Link>
             ))}
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-lg text-muted">No pets found. Try adjusting your filters.</p>
-          </div>
         )}
 
-        {/* Pagination */}
-        {data && data.totalPages > 1 && filteredPets.length > 0 && (
-          <div className="flex items-center justify-center gap-4">
-            <Button
-              onClick={handlePreviousPage}
-              disabled={page === 1}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
+        {/* ── Pagination ───────────────────────────────────────────────────── */}
+        {!isLoading && totalPages > 1 && paginated.length > 0 && (
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            {/* Prev */}
+            <button
+              onClick={() => setPage((p) => p - 1)}
+              disabled={safePage === 1}
+              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-border text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
               Previous
-            </Button>
+            </button>
 
-            <div className="flex items-center gap-2">
-              {Array.from({ length: totalPages }).map((_, i) => {
-                const pageNum = i + 1;
-                const isActive = pageNum === page;
-                const isNearby = Math.abs(pageNum - page) <= 1;
+            {/* Page numbers */}
+            {pageNumbers.map((n, i) =>
+              n === "…" ? (
+                <span key={`dots-${i}`} className="px-2 text-muted-foreground select-none">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={n}
+                  onClick={() => setPage(n as number)}
+                  className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                    n === safePage
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-border hover:bg-muted"
+                  }`}
+                >
+                  {n}
+                </button>
+              )
+            )}
 
-                if (!isActive && !isNearby && pageNum !== 1 && pageNum !== totalPages) {
-                  return null;
-                }
-
-                if (pageNum === 2 && page > 3) {
-                  return (
-                    <span key="dots-1" className="text-muted">
-                      ...
-                    </span>
-                  );
-                }
-
-                if (pageNum === totalPages - 1 && page < totalPages - 2) {
-                  return (
-                    <span key="dots-2" className="text-muted">
-                      ...
-                    </span>
-                  );
-                }
-
-                return (
-                  <Button
-                    key={pageNum}
-                    onClick={() => setPage(pageNum)}
-                    variant={isActive ? "default" : "outline"}
-                    size="sm"
-                    className={isActive ? "bg-accent text-accent-foreground" : ""}
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
-
-            <Button
-              onClick={handleNextPage}
-              disabled={page === totalPages}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
+            {/* Next */}
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={safePage === totalPages}
+              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-border text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-colors"
             >
               Next
               <ChevronRight className="w-4 h-4" />
-            </Button>
+            </button>
           </div>
         )}
+
       </div>
     </div>
   );

@@ -1,90 +1,117 @@
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { AuthProvider } from "./contexts/AuthContext";
 import Home from "./pages/Home";
 import PetListing from "./pages/PetListing";
 import PetDetail from "./pages/PetDetail";
 import UserDashboard from "./pages/UserDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminManagePets from "./pages/AdminManagePets";
+import AdminApplications from "./pages/AdminApplications";
 import { LoginPage } from "./pages/Login";
 import { RegisterPage } from "./pages/Register";
 import Navigation from "./components/Navigation";
 import { useAuth } from "./_core/hooks/useAuth";
-import { ReactNode } from "react";
+import { TooltipProvider } from "./components/ui/tooltip";
+import { Toaster } from "sonner";
+import NotFound from "./pages/NotFound";
+
+// ── Route Guards ──────────────────────────────────────────────────────────────
 
 /**
- * Protected route for authenticated users only
- * Redirects to login if not authenticated
+ * Authenticated users only (role = "user").
+ * Admins are redirected away — they have their own section.
+ * Shows nothing while auth is still rehydrating to avoid a flash.
  */
 function ProtectedUserRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated, user } = useAuth();
-  
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  if (isLoading) return null;
+
   if (!isAuthenticated) {
-    return <NotFound />;
+    return <Redirect to="/login" />;
   }
-  
-  // Admins cannot access user pages
+
+  // Admins belong in /admin, not /dashboard
   if (user?.role === "admin") {
-    return <NotFound />;
+    return <Redirect to="/admin" />;
   }
-  
+
   return <Component />;
 }
 
 /**
- * Protected route for admin users only
- * Redirects to home if not admin
+ * Admin users only.
+ * Non-admins are redirected to home.
  */
 function ProtectedAdminRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated, user } = useAuth();
-  
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  if (isLoading) return null;
+
   if (!isAuthenticated || user?.role !== "admin") {
-    return <NotFound />;
+    return <Redirect to="/" />;
   }
-  
+
   return <Component />;
 }
 
+// ── Router ────────────────────────────────────────────────────────────────────
 function Router() {
-  const { user } = useAuth();
-
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/login"} component={LoginPage} />
-      <Route path={"/register"} component={RegisterPage} />
-      <Route path={"/pets"} component={PetListing} />
-      <Route path={"/pets/:id"} component={PetDetail} />
-      {user && (
-        <Route path={"/dashboard"} component={() => <ProtectedUserRoute component={UserDashboard} />} />
-      )}
-      {user?.role === "admin" && (
-        <Route path={"/admin"} component={() => <ProtectedAdminRoute component={AdminDashboard} />} />
-      )}
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      {/* ── Public ──────────────────────────────────────────────────────── */}
+      <Route path="/"           component={Home} />
+      <Route path="/login"      component={LoginPage} />
+      <Route path="/register"   component={RegisterPage} />
+      <Route path="/pets"       component={PetListing} />
+      <Route path="/pets/:id"   component={PetDetail} />
+
+      {/* ── Authenticated user ────────────────────────────────────────────── */}
+      <Route
+        path="/dashboard"
+        component={() => <ProtectedUserRoute component={UserDashboard} />}
+      />
+
+      {/* ── Admin ──────────────────────────────────────────────────────────── */}
+      {/* <Route
+        path="/admin"
+        component={() => <ProtectedAdminRoute component={AdminDashboard} />}
+      />
+      <Route
+        path="/admin/pets"
+        component={() => <ProtectedAdminRoute component={AdminManagePets} />}
+      />
+      <Route
+        path="/admin/applications"
+        component={() => <ProtectedAdminRoute component={AdminApplications} />}
+      /> */}
+
+      {/* ── Fallback ───────────────────────────────────────────────────────── */}
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
+// ── App ───────────────────────────────────────────────────────────────────────
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
-        <TooltipProvider>
-          <Toaster />
-          <div className="min-h-screen flex flex-col bg-background text-foreground">
-            <Navigation />
-            <main className="flex-1">
-              <Router />
-            </main>
-          </div>
-        </TooltipProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemeProvider defaultTheme="light">
+          <TooltipProvider>
+            <Toaster />
+            <div className="min-h-screen flex flex-col bg-background text-foreground">
+              <Navigation />
+              <main className="flex-1">
+                <Router />
+              </main>
+            </div>
+          </TooltipProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }

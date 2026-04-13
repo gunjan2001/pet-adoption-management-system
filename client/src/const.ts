@@ -1,17 +1,31 @@
-export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+/// <reference types="vite/client" />
+// src/const.ts
 
-// Generate login URL at runtime so redirect URI reflects the current origin.
-export const getLoginUrl = () => {
-  const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
-  const appId = import.meta.env.VITE_APP_ID;
-  const redirectUri = `${window.location.origin}/api/oauth/callback`;
-  const state = btoa(redirectUri);
+export const API_BASE_URL =
+  (import.meta.env.VITE_API_URL as string) ?? "http://localhost:5000/api";
 
-  const url = new URL(`${oauthPortalUrl}/app-auth`);
-  url.searchParams.set("appId", appId);
-  url.searchParams.set("redirectUri", redirectUri);
-  url.searchParams.set("state", state);
-  url.searchParams.set("type", "signIn");
+export const TOKEN_KEY = "pat_token";   // localStorage key for JWT
+export const USER_KEY  = "pat_user";    // localStorage key for cached user
 
-  return url.toString();
-};
+export const ROLES = {
+  USER:  "user",
+  ADMIN: "admin",
+} as const;
+
+export const PET_STATUS = {
+  AVAILABLE: "available",
+  PENDING:   "pending",
+  ADOPTED:   "adopted",
+} as const;
+
+export const ADOPTION_STATUS = {
+  PENDING:  "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+} as const;
+
+export const PET_GENDER = {
+  MALE:    "male",
+  FEMALE:  "female",
+  UNKNOWN: "unknown",
+} as const;

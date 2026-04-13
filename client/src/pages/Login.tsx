@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, Link } from 'wouter';
-import { LoginForm } from '@/components/LoginForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import LoginForm from '@/components/LoginForm';
 
 export const LoginPage: React.FC = () => {
   const [, setLocation] = useLocation();
@@ -29,14 +29,14 @@ export const LoginPage: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <LoginForm
-            onSuccess={handleLoginSuccess}
-            onError={handleLoginError}
-          />
+          <LoginForm />
 
           <div className="mt-4 text-center text-sm">
-            Don't have an account?{' '}
-            <Link href="/register" className="text-blue-600 hover:underline font-medium">
+            Don't have an account?{" "}
+            <Link
+              href="/register"
+              className="text-blue-600 hover:underline font-medium"
+            >
               Create one
             </Link>
           </div>
