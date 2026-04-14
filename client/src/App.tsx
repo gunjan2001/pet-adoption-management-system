@@ -75,7 +75,7 @@ function Router() {
       />
 
       {/* ── Admin ──────────────────────────────────────────────────────────── */}
-      {/* <Route
+      <Route
         path="/admin"
         component={() => <ProtectedAdminRoute component={AdminDashboard} />}
       />
@@ -86,7 +86,7 @@ function Router() {
       <Route
         path="/admin/applications"
         component={() => <ProtectedAdminRoute component={AdminApplications} />}
-      /> */}
+      />
 
       {/* ── Fallback ───────────────────────────────────────────────────────── */}
       <Route path="/404" component={NotFound} />

@@ -17,6 +17,7 @@ export const getAllPets = async (
 ): Promise<void> => {
   try {
     const { page, limit, status, species, gender } = req.query;
+    
     const offset = (page - 1) * limit;
 
     const filters: SQL[] = [];

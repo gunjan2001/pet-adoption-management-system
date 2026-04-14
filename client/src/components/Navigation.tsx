@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Menu, X, LogIn, UserPlus } from "lucide-react";
+import { Menu, X, LogIn, UserPlus, LayoutGrid, LogOut } from "lucide-react";
 import { useState } from "react";
 
 export default function Navigation() {
@@ -14,6 +14,52 @@ export default function Navigation() {
     setMobileMenuOpen(false);
   };
 
+  // Render admin header for admin users
+  if (isAuthenticated && user?.role === "admin") {
+    return (
+      <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border/70 shadow-sm">
+        <div className="container  mx-auto px-4 max-w-7xl flex items-center justify-between h-16">
+          <Link href="/admin">
+            <div className="flex items-center gap-3">
+              <LayoutGrid className="w-5 h-5 text-primary" />
+              <span className="font-bold text-lg">Admin Panel</span>
+            </div>
+          </Link>
+          <div className="flex items-center gap-4">
+            <nav className="hidden md:flex items-center gap-1">
+              <Link href="/admin">
+                <span className="px-4 py-2 rounded-lg bg-primary/10 text-primary text-sm font-medium">
+                  Overview
+                </span>
+              </Link>
+              <Link href="/admin/pets">
+                <button className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors">
+                  Pets
+                </button>
+              </Link>
+              <Link href="/admin/applications">
+                <button className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors">
+                  Applications
+                </button>
+              </Link>
+            </nav>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground hidden md:block">{user?.email}</span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden md:inline">Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+    );
+  }
+
+  // Default navigation for regular users and guests
   return (
     <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border/70 shadow-sm">
       <div className="container">
@@ -58,17 +104,15 @@ export default function Navigation() {
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
               <>
-                <div className="flex items-center gap-2 pr-3 border-r border-border">
-                  <span className="text-sm font-medium">{user?.name || user?.email}</span>
-                  {user?.role === "admin" && (
-                    <span className="inline-flex items-center rounded-full bg-accent px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-foreground">
-                      Admin
-                    </span>
-                  )}
+                <div className="inline-flex items-center gap-3 rounded-full border border-border bg-background/70 px-4 py-2 shadow-sm">
+                  <div className="flex flex-col text-left">
+                    <span className="text-sm font-semibold text-foreground">{user?.name || user?.email}</span>
+                    <span className="text-xs text-muted">Verified User</span>
+                  </div>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="inline-flex items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted/10"
+                  className="inline-flex items-center justify-center rounded-full border border-border bg-muted/10 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted/20 hover:shadow-sm"
                 >
                   Logout
                 </button>
@@ -137,26 +181,24 @@ export default function Navigation() {
             </>
           )}
 
-          <div className="px-4 pt-4 border-t border-border space-y-3">
+          <div className="rounded-3xl border border-border bg-background/80 p-4 shadow-sm space-y-4">
             {isAuthenticated ? (
               <>
-                <div className="flex items-center justify-between py-2">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">{user?.name || user?.email}</span>
-                    <span className="text-xs text-muted">{user?.role === "admin" ? "Admin" : "User"}</span>
-                  </div>
-                  {user?.role === "admin" && (
-                    <span className="inline-flex items-center rounded-full bg-accent px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-foreground">
-                      Admin
-                    </span>
-                  )}
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-semibold text-foreground">Welcome back, {user?.name || user?.email}</span>
+                  <span className="text-xs uppercase tracking-[0.15em] text-muted">Member</span>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="w-full rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted/10"
-                >
-                  Logout
-                </button>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="rounded-2xl bg-muted/20 px-3 py-2 text-sm font-medium text-foreground">
+                    User
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="inline-flex flex-1 items-center justify-center rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 hover:shadow-sm"
+                  >
+                    Logout
+                  </button>
+                </div>
               </>
             ) : (
               <>

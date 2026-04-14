@@ -86,7 +86,7 @@ export const paginationSchema = z.object({
     .string()
     .optional()
     .transform((v) => (v ? parseInt(v, 10) : 10))
-    .pipe(z.number().int().min(1).max(100)),
+    .pipe(z.number().int().min(1).max(500)),
   status: z.enum(["available", "adopted", "pending"]).optional(),
   species: z.string().optional(),
   gender: z.enum(["male", "female", "unknown"]).optional(),
