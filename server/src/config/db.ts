@@ -17,14 +17,16 @@ const pool = new Pool({
   connectionTimeoutMillis: 2_000,
 });
 
-pool.on("connect", () => {
-  console.log("✅ PostgreSQL pool connected");
-});
+// Handle pool events for better debugging and stability
+// pool.on("connect", () => {
+//   console.log("✅ PostgreSQL pool connected");
+// });
 
-pool.on("error", (err: Error) => {
-  console.error("❌ Unexpected PostgreSQL pool error:", err.message);
-  process.exit(-1);
-});
+// To log the error if any occur during connection acquisition or query execution
+// pool.on("error", (err: Error) => {
+//   console.error("❌ Unexpected PostgreSQL pool error:", err.message);
+//   process.exit(-1);
+// });
 
 export const db = drizzle(pool, { schema });
 

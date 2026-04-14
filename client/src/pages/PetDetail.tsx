@@ -1,9 +1,7 @@
 // src/pages/PetDetail.tsx
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useForm, FieldValues } from "react-hook-form";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import { usePet } from "@/hooks/usePets";
@@ -11,20 +9,25 @@ import { adoptionsApi } from "@/lib/api/adoptions.api";
 import { getErrorMessage } from "@/lib/errorHandler";
 import { useAuth } from "@/_core/hooks/useAuth";
 
-// ── Zod schema — matches backend validation exactly ───────────────────────────
-const applicationSchema = z.object({
-  fullName:   z.string().min(2,  "Full name is required"),
-  email:      z.string().email("Valid email is required"),
-  phone:      z.string().min(7,  "Valid phone number is required"),
-  address:    z.string().min(5,  "Address is required"),
-  homeType:   z.enum(["house", "apartment", "condo", "townhouse", "other"]).optional(),
-  hasYard:    z.boolean().optional(),
-  otherPets:  z.string().optional(),
-  experience: z.string().optional(),
-  reason:     z.string().min(20, "Please explain why you want to adopt (min 20 chars)"),
-});
+// ── Custom validation functions ─────────────────────────────────────────────────
+const validateEmail = (email: string): true | string => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) ? true : "Valid email is required";
+};
 
-type ApplicationForm = z.infer<typeof applicationSchema>;
+const validHomeTypes = ["house", "apartment", "condo", "townhouse", "other"];
+
+interface ApplicationForm extends FieldValues {
+  fullName: string;
+  email: string;
+  phone: string;
+  address: string;
+  homeType?: string;
+  hasYard?: boolean;
+  otherPets?: string;
+  experience?: string;
+  reason: string;
+}
 
 // ── Shared Tailwind class fragments ───────────────────────────────────────────
 const inputBase =
@@ -51,7 +54,6 @@ export default function PetDetail() {
     formState: { errors, isSubmitting },
     reset,
   } = useForm<ApplicationForm>({
-    resolver: zodResolver(applicationSchema),
     defaultValues: {
       fullName:  user?.name    ?? "",
       email:     user?.email   ?? "",
@@ -63,7 +65,8 @@ export default function PetDetail() {
   const onSubmit = async (data: ApplicationForm) => {
     if (!petId) return;
     try {
-      await adoptionsApi.submit({ petId, ...data });
+      const homeType = data.homeType as "house" | "apartment" | "condo" | "townhouse" | "other" | undefined;
+      await adoptionsApi.submit({ petId, ...data, homeType });
       toast.success("Application submitted successfully!");
       reset();
       setShowForm(false);
@@ -252,7 +255,10 @@ export default function PetDetail() {
                 <div>
                   <label className={labelClass}>Full Name *</label>
                   <input
-                    {...register("fullName")}
+                    {...register("fullName", {
+                      required: "Full name is required",
+                      minLength: { value: 2, message: "Full name is required" },
+                    })}
                     placeholder="Jane Doe"
                     className={errors.fullName ? inputError : inputNormal}
                   />
@@ -261,7 +267,10 @@ export default function PetDetail() {
                 <div>
                   <label className={labelClass}>Email *</label>
                   <input
-                    {...register("email")}
+                    {...register("email", {
+                      required: "Valid email is required",
+                      validate: validateEmail,
+                    })}
                     type="email"
                     placeholder="you@example.com"
                     className={errors.email ? inputError : inputNormal}
@@ -275,7 +284,10 @@ export default function PetDetail() {
                 <div>
                   <label className={labelClass}>Phone *</label>
                   <input
-                    {...register("phone")}
+                    {...register("phone", {
+                      required: "Valid phone number is required",
+                      minLength: { value: 7, message: "Valid phone number is required" },
+                    })}
                     placeholder="+1 555 000 0000"
                     className={errors.phone ? inputError : inputNormal}
                   />
@@ -284,7 +296,10 @@ export default function PetDetail() {
                 <div>
                   <label className={labelClass}>Address *</label>
                   <input
-                    {...register("address")}
+                    {...register("address", {
+                      required: "Address is required",
+                      minLength: { value: 5, message: "Address is required" },
+                    })}
                     placeholder="123 Main St, City"
                     className={errors.address ? inputError : inputNormal}
                   />
@@ -297,7 +312,9 @@ export default function PetDetail() {
                 <div>
                   <label className={labelClass}>Home Type</label>
                   <select
-                    {...register("homeType")}
+                    {...register("homeType", {
+                      validate: (value) => !value || validHomeTypes.includes(value) ? true : "Invalid home type",
+                    })}
                     className={inputNormal}
                   >
                     <option value="">Select…</option>
@@ -348,7 +365,10 @@ export default function PetDetail() {
               <div>
                 <label className={labelClass}>Why do you want to adopt {pet.name}? *</label>
                 <textarea
-                  {...register("reason")}
+                  {...register("reason", {
+                    required: "Please explain why you want to adopt (min 20 chars)",
+                    minLength: { value: 20, message: "Please explain why you want to adopt (min 20 chars)" },
+                  })}
                   rows={4}
                   placeholder="Please share why you'd like to adopt this pet (min 20 characters)…"
                   className={errors.reason ? inputError : inputNormal}
