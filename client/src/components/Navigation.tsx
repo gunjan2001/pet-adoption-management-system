@@ -44,7 +44,7 @@ export default function Navigation() {
               </Link>
             </nav>
             <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground hidden md:block">{user?.email}</span>
+              {/* <span className="text-sm text-muted-foreground hidden md:block">{user?.email}</span> */}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -104,10 +104,10 @@ export default function Navigation() {
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
               <>
-                <div className="inline-flex items-center gap-3 rounded-full border border-border bg-background/70 px-4 py-2 shadow-sm">
+                <div className="inline-flex items-center gap-3 px-4 py-2">
                   <div className="flex flex-col text-left">
-                    <span className="text-sm font-semibold text-foreground">{user?.name || user?.email}</span>
-                    <span className="text-xs text-muted">Verified User</span>
+                    <span className="text-sm font-semibold">{user?.name || user?.email}</span>
+                    {/* <span className="text-xs text-muted">Verified User</span> */}
                   </div>
                 </div>
                 <button
@@ -126,7 +126,7 @@ export default function Navigation() {
                   </a>
                 </Link>
                 <Link href="/register">
-                  <a className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:bg-accent/90 hover:shadow-sm">
+                  <a className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold border text-accent-foreground transition hover:bg-accent/90">
                     <UserPlus className="w-4 h-4" />
                     Register
                   </a>
@@ -186,7 +186,7 @@ export default function Navigation() {
               <>
                 <div className="flex flex-col gap-1">
                   <span className="text-sm font-semibold text-foreground">Welcome back, {user?.name || user?.email}</span>
-                  <span className="text-xs uppercase tracking-[0.15em] text-muted">Member</span>
+                  {/* <span className="text-xs uppercase tracking-[0.15em] text-muted">Member</span> */}
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <div className="rounded-2xl bg-muted/20 px-3 py-2 text-sm font-medium text-foreground">
