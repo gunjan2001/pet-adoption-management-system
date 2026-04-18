@@ -10,7 +10,7 @@ import { Plus, Trash2, Edit2, ArrowLeft, Search, X } from "lucide-react";
 import type { Pet, CreatePetInput, PetStatus, Gender } from "@/types";
 
 // ── Shared input style ────────────────────────────────────────────────────────
-const inp = "w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm";
+const inp = "w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm transition-all";
 
 // ── Blank form ────────────────────────────────────────────────────────────────
 const BLANK: CreatePetInput = {
@@ -20,7 +20,7 @@ const BLANK: CreatePetInput = {
 
 const STATUS_DOT: Record<PetStatus, string> = {
   available: "bg-green-500",
-  pending:   "bg-yellow-500",
+  pending:   "bg-amber-500",
   adopted:   "bg-gray-400",
 };
 
@@ -110,21 +110,21 @@ export default function AdminManagePets() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white">
 
       <main className="container mx-auto px-4 max-w-7xl py-8">
 
         {/* ── Title + actions ──────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-black">Manage Pets</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-3xl font-black text-gray-900">Manage Pets</h1>
+            <p className="text-gray-600 mt-1">
               {pets.length} pet{pets.length !== 1 ? "s" : ""} in total
             </p>
           </div>
           <button
             onClick={openCreate}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-2 px-7 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all"
           >
             <Plus className="w-4 h-4" /> Add Pet
           </button>
@@ -132,7 +132,7 @@ export default function AdminManagePets() {
 
         {/* ── Search ───────────────────────────────────────────────────────── */}
         <div className="relative mb-6 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             placeholder="Search by name or species…"
@@ -141,37 +141,40 @@ export default function AdminManagePets() {
             className={`${inp} pl-9`}
           />
           {search && (
-            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-900 transition-colors">
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
 
         {/* ── Error ────────────────────────────────────────────────────────── */}
-        {error && <p className="text-destructive mb-4 text-sm">{error}</p>}
+        {error && <p className="text-red-500 mb-4 text-sm">{error}</p>}
 
         {/* ── Grid ─────────────────────────────────────────────────────────── */}
         {isLoading ? (
           <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-border overflow-hidden animate-pulse">
-                <div className="h-40 bg-muted" />
+              <div key={i} className="rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
+                <div className="h-40 bg-gray-100" />
                 <div className="p-4 space-y-2">
-                  <div className="h-4 w-3/4 bg-muted rounded" />
-                  <div className="h-3 w-1/2 bg-muted rounded" />
-                  <div className="h-8 w-full bg-muted rounded mt-3" />
+                  <div className="h-4 w-3/4 bg-gray-100 rounded" />
+                  <div className="h-3 w-1/2 bg-gray-100 rounded" />
+                  <div className="h-8 w-full bg-gray-100 rounded mt-3" />
                 </div>
               </div>
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 border border-dashed border-border rounded-xl">
+          <div className="text-center py-20 border border-dashed border-gray-200 rounded-2xl bg-white">
             <p className="text-5xl mb-4">🐾</p>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-gray-600 mb-4">
               {search ? "No pets match your search." : "No pets yet."}
             </p>
             {!search && (
-              <button onClick={openCreate} className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity">
+              <button 
+                onClick={openCreate} 
+                className="px-7 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all"
+              >
                 Add Your First Pet
               </button>
             )}
@@ -179,9 +182,9 @@ export default function AdminManagePets() {
         ) : (
           <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filtered.map((pet) => (
-              <div key={pet.id} className="rounded-xl border border-border overflow-hidden bg-card hover:shadow-md transition-shadow flex flex-col">
+              <div key={pet.id} className="rounded-2xl border border-gray-100 overflow-hidden bg-white hover:shadow-lg transition-shadow flex flex-col">
                 {/* Image */}
-                <div className="relative h-40 bg-muted flex-shrink-0">
+                <div className="relative h-40 bg-gray-50 flex-shrink-0">
                   {pet.imageUrl
                     ? <img src={pet.imageUrl} alt={pet.name} className="w-full h-full object-cover" />
                     : <div className="w-full h-full flex items-center justify-center text-4xl">🐾</div>}
@@ -190,25 +193,25 @@ export default function AdminManagePets() {
                 </div>
                 {/* Info */}
                 <div className="p-4 flex flex-col flex-1">
-                  <p className="font-bold truncate">{pet.name}</p>
-                  <p className="text-xs text-muted-foreground capitalize mb-1">{pet.species}{pet.breed ? ` · ${pet.breed}` : ""}</p>
-                  <div className="text-xs text-muted-foreground space-y-0.5 mb-3">
+                  <p className="font-bold text-gray-900 truncate">{pet.name}</p>
+                  <p className="text-xs text-gray-600 capitalize mb-1">{pet.species}{pet.breed ? ` · ${pet.breed}` : ""}</p>
+                  <div className="text-xs text-gray-600 space-y-0.5 mb-3">
                     {pet.age != null && <p>{Math.floor(pet.age / 12)} yr{Math.floor(pet.age / 12) !== 1 ? "s" : ""} {pet.age % 12}m · {pet.gender ?? "—"}</p>}
                     {pet.adoptionFee && <p>Fee: ${pet.adoptionFee}</p>}
-                    <p className="capitalize font-medium text-foreground">{pet.status}</p>
+                    <p className="capitalize font-medium text-gray-900">{pet.status}</p>
                   </div>
                   {/* Actions */}
                   <div className="flex gap-2 mt-auto">
                     <button
                       onClick={() => openEdit(pet)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-border text-sm hover:bg-muted transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 hover:border-amber-300 hover:text-amber-600 transition-colors"
                     >
                       <Edit2 className="w-3.5 h-3.5" /> Edit
                     </button>
                     <button
                       onClick={() => handleDelete(pet)}
                       disabled={deleting === pet.id}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-600 border border-red-200 text-sm hover:bg-red-100 disabled:opacity-50 transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-50 text-red-600 border border-red-200 text-sm hover:bg-red-100 disabled:opacity-50 transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       {deleting === pet.id ? "…" : "Delete"}
@@ -227,10 +230,10 @@ export default function AdminManagePets() {
           {/* Backdrop */}
           <div className="flex-1 bg-black/70 backdrop-blur-sm" onClick={closeForm} />
           {/* Panel */}
-          <div className="w-full max-w-lg z-10 bg-white border-l border-border border-zinc-200 shadow-2xl overflow-y-auto">
-            <div className="sticky top-0 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
-              <h2 className="font-bold text-lg">{editing ? `Edit ${editing.name}` : "Add New Pet"}</h2>
-              <button onClick={closeForm} className="text-muted-foreground hover:text-foreground transition-colors">
+          <div className="w-full max-w-lg z-10 bg-white border-l border-gray-200 shadow-2xl overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="font-bold text-lg text-gray-900">{editing ? `Edit ${editing.name}` : "Add New Pet"}</h2>
+              <button onClick={closeForm} className="text-gray-400 hover:text-gray-900 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -239,11 +242,11 @@ export default function AdminManagePets() {
               {/* Name + Species */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium mb-1 block">Name *</label>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Name *</label>
                   <input value={form.name} onChange={set("name")} required placeholder="Buddy" className={inp} />
                 </div>
                 <div>
-                  <label className="text-xs font-medium mb-1 block">Species *</label>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Species *</label>
                   <input value={form.species} onChange={set("species")} required placeholder="dog" className={inp} />
                 </div>
               </div>
@@ -251,11 +254,11 @@ export default function AdminManagePets() {
               {/* Breed + Age */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium mb-1 block">Breed</label>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Breed</label>
                   <input value={form.breed ?? ""} onChange={set("breed")} placeholder="Labrador" className={inp} />
                 </div>
                 <div>
-                  <label className="text-xs font-medium mb-1 block">Age (months)</label>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Age (months)</label>
                   <input
                     type="number" min={0}
                     value={form.age ?? ""}
@@ -269,7 +272,7 @@ export default function AdminManagePets() {
               {/* Gender + Status */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium mb-1 block">Gender</label>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Gender</label>
                   <select value={form.gender ?? "unknown"} onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value as Gender }))} className={inp}>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
@@ -277,7 +280,7 @@ export default function AdminManagePets() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium mb-1 block">Status</label>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Status</label>
                   <select value={form.status ?? "available"} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as PetStatus }))} className={inp}>
                     <option value="available">Available</option>
                     <option value="pending">Pending</option>
@@ -288,7 +291,7 @@ export default function AdminManagePets() {
 
               {/* Adoption fee */}
               <div>
-                <label className="text-xs font-medium mb-1 block">Adoption Fee ($)</label>
+                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Adoption Fee ($)</label>
                 <input
                   type="number" min={0} step={0.01}
                   value={form.adoptionFee ?? ""}
@@ -300,16 +303,16 @@ export default function AdminManagePets() {
 
               {/* Image URL */}
               <div>
-                <label className="text-xs font-medium mb-1 block">Image URL</label>
+                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Image URL</label>
                 <input value={form.imageUrl ?? ""} onChange={set("imageUrl")} placeholder="https://…" className={inp} />
                 {form.imageUrl && (
-                  <img src={form.imageUrl} alt="preview" className="mt-2 w-full h-32 object-cover rounded-lg" onError={(e) => (e.currentTarget.style.display = "none")} />
+                  <img src={form.imageUrl} alt="preview" className="mt-2 w-full h-32 object-cover rounded-xl" onError={(e) => (e.currentTarget.style.display = "none")} />
                 )}
               </div>
 
               {/* Description */}
               <div>
-                <label className="text-xs font-medium mb-1 block">Description</label>
+                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Description</label>
                 <textarea value={form.description ?? ""} onChange={set("description")} rows={3} placeholder="Tell adopters about this pet…" className={inp} />
               </div>
 
@@ -318,14 +321,14 @@ export default function AdminManagePets() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  className="flex-1 px-7 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all disabled:opacity-50"
                 >
                   {saving ? "Saving…" : editing ? "Save Changes" : "Add Pet"}
                 </button>
                 <button
                   type="button"
                   onClick={closeForm}
-                  className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:border-amber-300 hover:text-amber-600 font-semibold transition-colors"
                 >
                   Cancel
                 </button>
