@@ -1,14 +1,14 @@
 // src/hooks/usePets.ts
-import { useCallback, useEffect, useState } from "react";
-import { petsApi } from "../lib/api/pets.api.js";
-import { Pet, PetFilters } from "../types/index.js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { petsApi } from "@/lib/api/pets.api";
+import { Pet, PetFilters } from "@/types";
 
-// ── useAllPets ─────────────────────────────────────────────────────────────
 export interface UsePetsResult {
   pets:       Pet[];
   total:      number;
   totalPages: number;
-  isLoading:  boolean;
+  isLoading:  boolean;   // true only on FIRST load (no data yet)  → show skeletons
+  isFetching: boolean;   // true on EVERY fetch (incl. filter/page) → show subtle overlay
   error:      string | null;
   refetch:    () => void;
 }
@@ -17,16 +17,22 @@ export const usePets = (filters: PetFilters = {}): UsePetsResult => {
   const [pets,       setPets]       = useState<Pet[]>([]);
   const [total,      setTotal]      = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [isLoading,  setIsLoading]  = useState(true);
+  const [isLoading,  setIsLoading]  = useState(true);  // skeleton on first paint
+  const [isFetching, setIsFetching] = useState(false); // subtle indicator on refetch
   const [error,      setError]      = useState<string | null>(null);
   const [tick,       setTick]       = useState(0);
 
-  // Stringify filters so useEffect dep comparison works correctly
-  const filtersKey = JSON.stringify(filters);
+  const filtersKey   = JSON.stringify(filters);
+  const hasData      = useRef(false); // tracks whether we've ever received data
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
+
+    // Only show full skeletons when we have no data yet
+    if (!hasData.current) {
+      setIsLoading(true);
+    }
+    setIsFetching(true);
     setError(null);
 
     petsApi
@@ -36,13 +42,16 @@ export const usePets = (filters: PetFilters = {}): UsePetsResult => {
         setPets(data);
         setTotal(pagination.total);
         setTotalPages(pagination.totalPages);
+        hasData.current = true;
       })
       .catch((err) => {
         if (cancelled) return;
         setError(err?.response?.data?.message ?? "Failed to load pets");
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (cancelled) return;
+        setIsLoading(false);
+        setIsFetching(false);
       });
 
     return () => { cancelled = true; };
@@ -51,10 +60,10 @@ export const usePets = (filters: PetFilters = {}): UsePetsResult => {
 
   const refetch = useCallback(() => setTick((t) => t + 1), []);
 
-  return { pets, total, totalPages, isLoading, error, refetch };
+  return { pets, total, totalPages, isLoading, isFetching, error, refetch };
 };
 
-// ── usePet (single) ─────────────────────────────────────────────────────────
+// ── usePet (single) ──────────────────────────────────────────────────────────
 export interface UsePetResult {
   pet:       Pet | null;
   isLoading: boolean;

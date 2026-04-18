@@ -138,4 +138,8 @@ export interface PetFilters {
   status?:  PetStatus;
   species?: string;
   gender?:  Gender;
+  search?:  string;
+  breed?:   string;
+  minAge?:  number;
+  maxAge?:  number;
 }

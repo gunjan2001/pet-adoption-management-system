@@ -9,9 +9,14 @@ export default function RegisterForm() {
   const { register, isAuthenticated, user } = useAuth();
   const [, navigate] = useLocation();
 
-  const [form,    setForm]    = useState({ name: "", email: "", password: "", phone: "", address: "" });
-  const [errors,  setErrors]  = useState<Record<string, string>>({});
-  const [apiErr,  setApiErr]  = useState<string | null>(null);
+  const [form, setForm] = useState({ 
+    name: "", 
+    email: "", 
+    password: "", 
+    phone: "", 
+    address: "" 
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -24,6 +29,7 @@ export default function RegisterForm() {
     navigate(destination);
   }, [isAuthenticated, user?.role, navigate]);
 
+  // ── Validation functions ─────────────────────────────────────────────────
   const validateName = (value: string): string | null => {
     if (!value.trim()) return "Full name is required";
     if (value.trim().length < 2) return "Full name must be at least 2 characters";
@@ -108,7 +114,6 @@ export default function RegisterForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setApiErr(null);
 
     if (!validateForm()) {
       return;
@@ -117,6 +122,7 @@ export default function RegisterForm() {
     setLoading(true);
     try {
       await register(form);
+      toast.success("Account created successfully!");
     } catch (err) {
       const fields = getFieldErrors(err);
       if (fields.length > 0) {
@@ -126,7 +132,6 @@ export default function RegisterForm() {
         });
         setErrors(map);
       } else {
-        setApiErr(getErrorMessage(err));
         toast.error(getErrorMessage(err));
       }
     } finally {
@@ -140,8 +145,11 @@ export default function RegisterForm() {
     type = "text",
     placeholder = ""
   ) => (
-    <div className="space-y-1">
-      <label htmlFor={name} className="text-sm font-medium">
+    <div className="space-y-1.5">
+      <label 
+        htmlFor={name} 
+        className="text-sm font-medium text-gray-700"
+      >
         {label}
       </label>
       <input
@@ -152,31 +160,31 @@ export default function RegisterForm() {
         onChange={handleChange}
         onBlur={handleBlur}
         placeholder={placeholder}
-        autoComplete={"off"}
-        className={`w-full h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none transition focus-visible:ring-[1px] focus:ring-black/10 ${errors[name] ? "border-red-500 focus-visible:ring-red-400" : ""}`}
+        autoComplete="off"
+        className={`w-full px-4 py-2 border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 transition-all ${
+          errors[name] 
+            ? "border-red-300 focus:ring-red-400" 
+            : "border-gray-200 focus:ring-amber-400"
+        }`}
       />
-      {errors[name] && <p className="text-xs text-red-500">{errors[name]}</p>}
+      {errors[name] && (
+        <p className="text-xs text-red-500 mt-1">{errors[name]}</p>
+      )}
     </div>
   );
 
   return (
     <div>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-2">
         {field("name", "Full name *", "text", "Jane Doe")}
         {field("email", "Email *", "text", "you@example.com")}
         {field("password", "Password *", "password", "Min 8 chars, 1 uppercase, 1 number")}
         {field("phone", "Phone", "tel", "+1 555 000 0000")}
         {field("address", "Address", "text", "123 Main St")}
 
-        {/* {apiErr && (
-          <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-600">
-            {apiErr}
-          </p>
-        )} */}
-
         <button
           type="submit"
-          className="w-full h-12 rounded-xl bg-black text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-900 cursor-pointer"
+          className="w-full px-7 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={loading}
         >
           {loading ? "Creating account…" : "Create account"}
@@ -185,4 +193,3 @@ export default function RegisterForm() {
     </div>
   );
 }
-

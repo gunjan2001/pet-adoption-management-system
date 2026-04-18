@@ -208,8 +208,8 @@ export default function AdminApplications() {
       {/* ── Review Dialog ─────────────────────────────────────────────────────── */}
       {reviewing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setReviewing(null)} />
-          <div className="relative bg-background rounded-2xl border border-border shadow-xl w-full max-w-md p-6 space-y-5">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setReviewing(null)} />
+          <div className="relative z-10 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-2xl w-full max-w-md p-6 space-y-5">
 
             <h2 className="font-bold text-lg">Review Application</h2>
 

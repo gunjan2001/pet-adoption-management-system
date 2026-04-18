@@ -90,6 +90,18 @@ export const paginationSchema = z.object({
   status: z.enum(["available", "adopted", "pending"]).optional(),
   species: z.string().optional(),
   gender: z.enum(["male", "female", "unknown"]).optional(),
+  search: z.string().optional(),
+  breed: z.string().optional(),
+  minAge: z
+    .string()
+    .optional()
+    .transform((v) => (v ? parseInt(v, 10) : undefined))
+    .pipe(z.number().int().nonnegative().optional()),
+  maxAge: z
+    .string()
+    .optional()
+    .transform((v) => (v ? parseInt(v, 10) : undefined))
+    .pipe(z.number().int().nonnegative().optional()),
 });
 
 // ── Inferred TypeScript types from schemas ────────────────────────────────────

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getErrorMessage, getFieldErrors } from "@/lib/errorHandler";
 
-// ── Validation functions ───────────────────────────────────────────────────────
+// ── Validation functions ───────────────────────────────────────────────────
 const validateEmail = (email: string): string | null => {
   if (!email.trim()) {
     return "Email is required";
@@ -31,12 +31,12 @@ export default function LoginForm() {
   const { login, isAuthenticated, user } = useAuth();
   const [, navigate] = useLocation();
 
-  const [email,    setEmail]    = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading,  setLoading]  = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Field-specific errors
-  const [emailError,    setEmailError]    = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,6 +80,7 @@ export default function LoginForm() {
     setLoading(true);
     try {
       await login({ email, password });
+      toast.success("Welcome back!");
     } catch (err) {
       // Show backend errors in toast
       const fields = getFieldErrors(err);
@@ -96,8 +97,13 @@ export default function LoginForm() {
   return (
     <div>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1">
-          <label htmlFor="email" className="flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50">Email</label>
+        <div className="space-y-1.5">
+          <label 
+            htmlFor="email" 
+            className="text-sm font-medium text-gray-700"
+          >
+            Email
+          </label>
           <input
             id="email"
             type="email"
@@ -106,13 +112,24 @@ export default function LoginForm() {
             onBlur={handleEmailBlur}
             placeholder="you@example.com"
             autoComplete="off"
-            className={`file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[1px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive ${emailError ? 'border-red-500 focus-visible:ring-red-400' : ''}`}
+            className={`w-full px-4 py-2.5 border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 transition-all ${
+              emailError 
+                ? "border-red-300 focus:ring-red-400" 
+                : "border-gray-200 focus:ring-amber-400"
+            }`}
           />
-          {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
+          {emailError && (
+            <p className="text-xs text-red-500 mt-1">{emailError}</p>
+          )}
         </div>
 
-        <div className="space-y-1">
-          <label htmlFor="password" className="flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50">Password</label>
+        <div className="space-y-1.5">
+          <label 
+            htmlFor="password" 
+            className="text-sm font-medium text-gray-700"
+          >
+            Password
+          </label>
           <input
             id="password"
             type="password"
@@ -121,14 +138,20 @@ export default function LoginForm() {
             onBlur={handlePasswordBlur}
             placeholder="••••••••"
             autoComplete="off"
-            className={`file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[1px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive ${passwordError ? 'border-red-500 focus-visible:ring-red-400' : ''}`}
+            className={`w-full px-4 py-2.5 border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 transition-all ${
+              passwordError 
+                ? "border-red-300 focus:ring-red-400" 
+                : "border-gray-200 focus:ring-amber-400"
+            }`}
           />
-          {passwordError && <p className="text-red-500 text-xs mt-1">{passwordError}</p>}
+          {passwordError && (
+            <p className="text-xs text-red-500 mt-1">{passwordError}</p>
+          )}
         </div>
 
         <button
           type="submit"
-          className="w-full h-12 rounded-xl bg-black text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-900 cursor-pointer"
+          className="w-full px-7 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={loading}
         >
           {loading ? "Signing in…" : "Sign in"}

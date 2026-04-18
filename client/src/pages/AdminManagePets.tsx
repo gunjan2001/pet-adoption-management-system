@@ -225,9 +225,9 @@ export default function AdminManagePets() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex">
           {/* Backdrop */}
-          <div className="flex-1 bg-black/40" onClick={closeForm} />
+          <div className="flex-1 bg-black/70 backdrop-blur-sm" onClick={closeForm} />
           {/* Panel */}
-          <div className="w-full max-w-lg bg-background border-l border-border overflow-y-auto">
+          <div className="w-full max-w-lg z-10 bg-white border-l border-border border-zinc-200 shadow-2xl overflow-y-auto">
             <div className="sticky top-0 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
               <h2 className="font-bold text-lg">{editing ? `Edit ${editing.name}` : "Add New Pet"}</h2>
               <button onClick={closeForm} className="text-muted-foreground hover:text-foreground transition-colors">

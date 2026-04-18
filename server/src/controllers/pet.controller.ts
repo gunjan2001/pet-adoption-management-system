@@ -16,7 +16,7 @@ export const getAllPets = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page, limit, status, species, gender } = req.query;
+    const { page, limit, status, species, gender, search, breed, minAge, maxAge } = req.query;
     
     const offset = (page - 1) * limit;
 
@@ -24,6 +24,10 @@ export const getAllPets = async (
     if (status)  filters.push(eq(pets.status,  status));
     if (gender)  filters.push(eq(pets.gender,  gender));
     if (species) filters.push(ilike(pets.species, `%${species}%`));
+    if (breed)   filters.push(ilike(pets.breed, `%${breed}%`));
+    if (search)  filters.push(ilike(pets.name, `%${search}%`));
+    if (minAge) filters.push(sql`${pets.age} >= ${minAge}`);
+    if (maxAge) filters.push(sql`${pets.age} <= ${maxAge}`);
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;
 
