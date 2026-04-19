@@ -1,137 +1,217 @@
-import { trpc } from "@/lib/trpc";
+// src/pages/UserDashboard.tsx
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useLocation } from "wouter";
-import { useEffect } from "react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Link, useLocation } from "wouter";
+import { useEffect, useState } from "react";
+import { useMyApplications } from "@/hooks/useAdoptions";
+import { adoptionsApi } from "@/lib/api/adoptions.api";
+import { getErrorMessage } from "@/lib/errorHandler";
 import { format } from "date-fns";
+import { PawPrint, ArrowRight, Clock, CheckCircle2, XCircle, LogOut } from "lucide-react";
+import { toast } from "sonner";
+import type { AdoptionStatus } from "@/types";
+
+const STATUS_CONFIG: Record<AdoptionStatus, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
+  pending:  { bg: "bg-amber-50  border-amber-200",  text: "text-amber-700",  icon: <Clock       className="w-4 h-4 text-amber-500" />,  label: "Pending"  },
+  approved: { bg: "bg-green-50  border-green-200",  text: "text-green-700",  icon: <CheckCircle2 className="w-4 h-4 text-green-500" />,  label: "Approved" },
+  rejected: { bg: "bg-red-50    border-red-200",    text: "text-red-700",    icon: <XCircle     className="w-4 h-4 text-red-500" />,    label: "Rejected" },
+};
 
 export default function UserDashboard() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const [, setLocation] = useLocation();
+  const { applications, isLoading, refetch } = useMyApplications();
+  const [withdrawing, setWithdrawing] = useState<number | null>(null);
 
-  // Redirect to login if not authenticated, or to admin if admin user
   useEffect(() => {
-    if (!isAuthenticated) {
-      setLocation("/");
-    } else if (user?.role === "admin") {
-      setLocation("/admin");
-    }
+    if (!isAuthenticated) setLocation("/");
+    else if (user?.role === "admin") setLocation("/admin");
   }, [isAuthenticated, user?.role, setLocation]);
 
-  const { data: applications, isLoading } = trpc.applications.myApplications.useQuery(undefined, {
-    enabled: isAuthenticated && user?.role !== "admin",
-    refetchOnMount: 'always',
-  });
+  if (!isAuthenticated) return null;
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "approved":
-        return "bg-green-100 text-green-800";
-      case "rejected":
-        return "bg-red-100 text-red-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+  const handleWithdraw = async (id: number) => {
+    if (!confirm("Are you sure you want to withdraw this application?")) return;
+    setWithdrawing(id);
+    try {
+      await adoptionsApi.withdraw(id);
+      toast.success("Application withdrawn");
+      refetch();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setWithdrawing(null);
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
+  const counts = {
+    total:    applications.length,
+    pending:  applications.filter((a) => a.application.status === "pending").length,
+    approved: applications.filter((a) => a.application.status === "approved").length,
+    rejected: applications.filter((a) => a.application.status === "rejected").length,
   };
 
   return (
-    <div className="min-h-screen py-12 md:py-20">
-      <div className="container">
-        {/* Header */}
-        <div className="mb-12">
-          <h1 className="text-4xl md:text-5xl font-black mb-2">My Applications</h1>
-          <p className="text-lg text-muted">Track your adoption applications and their status</p>
+    <div className="min-h-screen bg-gradient-to-b from-amber-50/60 to-white">
+      <div className="container mx-auto px-4 max-w-5xl py-12 md:py-20">
+
+        {/* ── Header ────────────────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-10">
+          <div>
+            <p className="text-amber-600 font-bold text-sm uppercase tracking-widest mb-1">My Account</p>
+            <h1 className="text-4xl font-black text-gray-900">My Applications</h1>
+            <p className="text-gray-500 mt-1">
+              Welcome back, <span className="font-semibold text-gray-700">{user?.name ?? user?.email}</span>
+            </p>
+          </div>
+          {/* <div className="flex items-center gap-2 flex-shrink-0">
+            <Link href="/pets">
+              <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold shadow-sm shadow-amber-200 transition-colors cursor-pointer">
+                <PawPrint className="w-4 h-4" /> Browse Pets
+              </span>
+            </Link>
+            <button onClick={logout}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-600 hover:text-red-500 hover:border-red-200 transition-colors">
+              <LogOut className="w-4 h-4" /> Logout
+            </button>
+          </div> */}
         </div>
 
-        {/* Applications List */}
-        {isLoading ? (
-          <div className="space-y-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-card border border-border rounded-lg p-6">
-                <Skeleton className="h-6 w-1/4 mb-4" />
-                <Skeleton className="h-4 w-1/2 mb-2" />
-                <Skeleton className="h-4 w-1/3" />
+        {/* ── Stat pills ───────────────────────────────────────────────────── */}
+        {!isLoading && applications.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+            {[
+              { label: "Total",    value: counts.total,    color: "text-gray-900",   bg: "bg-white"        },
+              { label: "Pending",  value: counts.pending,  color: "text-amber-700",  bg: "bg-amber-50"     },
+              { label: "Approved", value: counts.approved, color: "text-green-700",  bg: "bg-green-50"     },
+              { label: "Rejected", value: counts.rejected, color: "text-red-600",    bg: "bg-red-50"       },
+            ].map(({ label, value, color, bg }) => (
+              <div key={label} className={`${bg} rounded-2xl border border-gray-100 p-4 text-center`}>
+                <p className={`text-2xl font-black ${color}`}>{value}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{label}</p>
               </div>
             ))}
           </div>
-        ) : applications && applications.length > 0 ? (
+        )}
+
+        {/* ── Applications list ────────────────────────────────────────────── */}
+        {isLoading ? (
           <div className="space-y-4">
-            {applications.map((app) => (
-              <Card
-                key={app.id}
-                className="p-6 border border-border hover:shadow-lg transition-shadow"
-              >
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-bold">Application #{app.id}</h3>
-                      <Badge
-                        className={`${getStatusColor(app.status)} border-0`}
-                      >
-                        {getStatusLabel(app.status)}
-                      </Badge>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted">Pet ID</p>
-                        <p className="font-semibold">Pet #{app.petId}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted">Applied On</p>
-                        <p className="font-semibold">
-                          {format(new Date(app.createdAt), "MMM d, yyyy")}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted">Home Type</p>
-                        <p className="font-semibold capitalize">{app.homeType || "Not specified"}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted">Has Yard</p>
-                        <p className="font-semibold">{app.hasYard ? "Yes" : "No"}</p>
-                      </div>
-                    </div>
-
-                    {app.reason && (
-                      <div className="mt-4">
-                        <p className="text-sm text-muted mb-1">Why you want to adopt</p>
-                        <p className="text-sm line-clamp-2">{app.reason}</p>
-                      </div>
-                    )}
-
-                    {app.adminNotes && (
-                      <div className="mt-4 p-3 bg-muted/10 rounded-lg border border-border">
-                        <p className="text-sm text-muted mb-1">Admin Notes</p>
-                        <p className="text-sm">{app.adminNotes}</p>
-                      </div>
-                    )}
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-3xl border border-gray-100 p-6 animate-pulse">
+                <div className="flex gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-100 flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-5 w-1/3 bg-gray-100 rounded-lg" />
+                    <div className="h-4 w-1/2 bg-gray-100 rounded-lg" />
+                    <div className="h-4 w-1/4 bg-gray-100 rounded-lg" />
                   </div>
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
+
+        ) : applications.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-amber-200">
+            <p className="text-5xl mb-4">🐾</p>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No applications yet</h3>
+            <p className="text-gray-500 mb-6">Find a pet you love and start your adoption journey!</p>
+            <Link href="/pets">
+              <span className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-lg shadow-amber-200 transition-colors cursor-pointer">
+                Browse Pets <ArrowRight className="w-4 h-4" />
+              </span>
+            </Link>
+          </div>
+
         ) : (
-          <div className="text-center py-12 bg-card border border-border rounded-lg">
-            <p className="text-lg text-muted mb-4">You haven't submitted any applications yet</p>
-            <a
-              href="/pets"
-              className="inline-flex items-center justify-center px-6 py-3 bg-accent text-accent-foreground font-semibold rounded-lg hover:opacity-90 transition-opacity"
-            >
-              Browse Pets
-            </a>
+          <div className="space-y-4">
+            {applications.map(({ application, pet }) => {
+              const cfg = STATUS_CONFIG[application.status];
+              return (
+                <div key={application.id}
+                  className="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+
+                  {/* Coloured top stripe based on status */}
+                  <div className={`h-1 w-full ${
+                    application.status === "approved" ? "bg-green-400"
+                    : application.status === "rejected" ? "bg-red-400"
+                    : "bg-amber-400"}`} />
+
+                  <div className="p-5 sm:p-6">
+                    <div className="flex gap-4 items-start">
+                      {/* Pet image */}
+                      <div className="w-16 h-16 rounded-2xl bg-amber-50 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                        {pet.imageUrl
+                          ? <img src={pet.imageUrl} alt={pet.name} className="w-full h-full object-cover" />
+                          : <span className="text-2xl">🐾</span>}
+                      </div>
+
+                      {/* Main content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between flex-wrap gap-2 mb-2">
+                          <div>
+                            <h3 className="font-bold text-gray-900">{pet.name}</h3>
+                            <p className="text-sm text-gray-500 capitalize">
+                              {pet.species}{pet.breed ? ` · ${pet.breed}` : ""}
+                            </p>
+                          </div>
+                          {/* Status badge */}
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${cfg.bg} ${cfg.text}`}>
+                            {cfg.icon} {cfg.label}
+                          </span>
+                        </div>
+
+                        {/* Details grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 text-xs">
+                          <div className="bg-gray-50 rounded-xl p-2.5">
+                            <p className="text-gray-400 mb-0.5">App #</p>
+                            <p className="font-semibold text-gray-700">#{application.id}</p>
+                          </div>
+                          <div className="bg-gray-50 rounded-xl p-2.5">
+                            <p className="text-gray-400 mb-0.5">Applied</p>
+                            <p className="font-semibold text-gray-700">{format(new Date(application.createdAt), "MMM d, yyyy")}</p>
+                          </div>
+                          <div className="bg-gray-50 rounded-xl p-2.5">
+                            <p className="text-gray-400 mb-0.5">Home Type</p>
+                            <p className="font-semibold text-gray-700 capitalize">{application.homeType || "—"}</p>
+                          </div>
+                          <div className="bg-gray-50 rounded-xl p-2.5">
+                            <p className="text-gray-400 mb-0.5">Has Yard</p>
+                            <p className="font-semibold text-gray-700">{application.hasYard ? "Yes" : "No"}</p>
+                          </div>
+                        </div>
+
+                        {/* Reason */}
+                        {application.reason && (
+                          <div className="mt-3 bg-amber-50 rounded-xl px-4 py-3">
+                            <p className="text-xs font-semibold text-amber-700 mb-1">Your reason</p>
+                            <p className="text-sm text-gray-700 line-clamp-2 leading-relaxed">{application.reason}</p>
+                          </div>
+                        )}
+
+                        {/* Admin notes */}
+                        {application.adminNotes && (
+                          <div className={`mt-3 rounded-xl px-4 py-3 border ${cfg.bg}`}>
+                            <p className={`text-xs font-semibold mb-1 ${cfg.text}`}>Admin note</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{application.adminNotes}</p>
+                          </div>
+                        )}
+
+                        {/* Withdraw */}
+                        {application.status === "pending" && (
+                          <div className="mt-4 flex justify-end">
+                            <button onClick={() => handleWithdraw(application.id)}
+                              disabled={withdrawing === application.id}
+                              className="px-4 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 disabled:opacity-50 transition-colors">
+                              {withdrawing === application.id ? "Withdrawing…" : "Withdraw Application"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

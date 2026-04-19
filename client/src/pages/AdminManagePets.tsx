@@ -1,256 +1,342 @@
+// src/pages/AdminManagePets.tsx
 import { useState, useMemo } from "react";
-import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { usePets } from "@/hooks/usePets";
+import { petsApi } from "@/lib/api/pets.api";
+import { getErrorMessage } from "@/lib/errorHandler";
 import { toast } from "sonner";
-import { Plus, Trash2, Edit2 } from "lucide-react";
-import PetFormModal from "@/components/PetFormModal";
-import AdminLayout from "@/components/AdminLayout";
+import { Plus, Trash2, Edit2, ArrowLeft, Search, X } from "lucide-react";
+import type { Pet, CreatePetInput, PetStatus, Gender } from "@/types";
+
+// ── Shared input style ────────────────────────────────────────────────────────
+const inp = "w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm transition-all";
+
+// ── Blank form ────────────────────────────────────────────────────────────────
+const BLANK: CreatePetInput = {
+  name: "", species: "", breed: "", description: "", imageUrl: "",
+  gender: "unknown", status: "available",
+};
+
+const STATUS_DOT: Record<PetStatus, string> = {
+  available: "bg-green-500",
+  pending:   "bg-amber-500",
+  adopted:   "bg-gray-400",
+};
 
 export default function AdminManagePets() {
-  const { user, isAuthenticated } = useAuth();
-  const [, setLocation] = useLocation();
-  const [petFormOpen, setPetFormOpen] = useState(false);
-  const [editingPetId, setEditingPetId] = useState<number | null>(null);
+  const { logout, user } = useAuth();
+  const [, navigate]     = useLocation();
 
-  // Redirect if not admin
-  useEffect(() => {
-    if (!isAuthenticated || user?.role !== "admin") {
-      setLocation("/");
-    }
-  }, [isAuthenticated, user?.role, setLocation]);
+  const { pets, isLoading, error, refetch } = usePets({ limit: 500, page: 1 });
 
-  // Queries
-  const { data: pets, isLoading: petsLoading, refetch: refetchPets } = trpc.pets.list.useQuery(
-    {
-      page: 1,
-      limit: 50,
-    },
-    {
-      staleTime: 1000 * 60,
-      enabled: isAuthenticated && user?.role === "admin",
-    }
+  // ── Search ────────────────────────────────────────────────────────────────
+  const [search, setSearch] = useState("");
+  const filtered = useMemo(
+    () => pets.filter(
+      (p) => p.name.toLowerCase().includes(search.toLowerCase()) ||
+             p.species.toLowerCase().includes(search.toLowerCase())
+    ),
+    [pets, search]
   );
 
-  // Get editing pet data
-  const editingPet = useMemo(() => {
-    if (!editingPetId || !pets?.pets) return undefined;
-    return pets.pets.find((p) => p.id === editingPetId);
-  }, [editingPetId, pets?.pets]);
+  // ── Form state ────────────────────────────────────────────────────────────
+  const [showForm,  setShowForm]  = useState(false);
+  const [editing,   setEditing]   = useState<Pet | null>(null);
+  const [form,      setForm]      = useState<CreatePetInput>(BLANK);
+  const [saving,    setSaving]    = useState(false);
+  const [deleting,  setDeleting]  = useState<number | null>(null);
 
-  // Mutations
-  const createPetMutation = trpc.pets.create.useMutation({
-    onSuccess: () => {
-      toast.success("Pet added successfully");
-      void refetchPets();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
+  const openCreate = () => {
+    setEditing(null);
+    setForm(BLANK);
+    setShowForm(true);
+  };
 
-  const updatePetMutation = trpc.pets.update.useMutation({
-    onSuccess: () => {
-      toast.success("Pet updated successfully");
-      void refetchPets();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
+  const openEdit = (pet: Pet) => {
+    setEditing(pet);
+    setForm({
+      name:        pet.name,
+      species:     pet.species,
+      breed:       pet.breed       ?? "",
+      description: pet.description ?? "",
+      imageUrl:    pet.imageUrl    ?? "",
+      gender:      pet.gender      ?? "unknown",
+      status:      pet.status,
+      age:         pet.age         ?? undefined,
+      adoptionFee: pet.adoptionFee ? Number(pet.adoptionFee) : undefined,
+    });
+    setShowForm(true);
+  };
 
-  const deletePetMutation = trpc.pets.delete.useMutation({
-    onSuccess: () => {
-      toast.success("Pet deleted");
-      void refetchPets();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
+  const closeForm = () => { setShowForm(false); setEditing(null); };
 
-  if (!isAuthenticated || user?.role !== "admin") {
-    return null;
-  }
+  const set = (field: keyof CreatePetInput) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  const handlePetFormSubmit = async (data: any) => {
-    if (editingPetId) {
-      await updatePetMutation.mutateAsync({
-        id: editingPetId,
-        data: {
-          ...data,
-          age: data.age ? parseInt(data.age) : undefined,
-          adoptionFee: data.adoptionFee ? parseFloat(data.adoptionFee) : undefined,
-        },
-      });
-    } else {
-      await createPetMutation.mutateAsync({
-        ...data,
-        age: data.age ? parseInt(data.age) : undefined,
-        adoptionFee: data.adoptionFee ? parseFloat(data.adoptionFee) : undefined,
-      });
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (editing) {
+        await petsApi.update(editing.id, form);
+        toast.success(`${form.name} updated`);
+      } else {
+        await petsApi.create(form);
+        toast.success(`${form.name} added`);
+      }
+      closeForm();
+      refetch();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
     }
-    setPetFormOpen(false);
-    setEditingPetId(null);
   };
 
-  const handleOpenCreateForm = () => {
-    setEditingPetId(null);
-    setPetFormOpen(true);
-  };
-
-  const handleOpenEditForm = (petId: number) => {
-    setEditingPetId(petId);
-    setPetFormOpen(true);
-  };
-
-  const handleCloseForm = () => {
-    setPetFormOpen(false);
-    setEditingPetId(null);
+  const handleDelete = async (pet: Pet) => {
+    if (!confirm(`Delete "${pet.name}"? This cannot be undone.`)) return;
+    setDeleting(pet.id);
+    try {
+      await petsApi.delete(pet.id);
+      toast.success(`${pet.name} deleted`);
+      refetch();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setDeleting(null);
+    }
   };
 
   return (
-    <AdminLayout activeTab="pets">
-      <div className="py-8 md:py-12">
-        <div className="container">
-          {/* Page Title */}
-          <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-black">Manage Pets</h1>
-            <p className="text-muted mt-2">Add, edit, or delete pets from the adoption list</p>
+    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white">
+
+      <main className="container mx-auto px-4 max-w-7xl py-8">
+
+        {/* ── Title + actions ──────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-black text-gray-900">Manage Pets</h1>
+            <p className="text-gray-600 mt-1">
+              {pets.length} pet{pets.length !== 1 ? "s" : ""} in total
+            </p>
           </div>
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 px-7 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all"
+          >
+            <Plus className="w-4 h-4" /> Add Pet
+          </button>
+        </div>
 
-          {/* Add Pet Button */}
-          <div className="mb-8">
-            <Button
-              onClick={handleOpenCreateForm}
-              className="bg-accent text-accent-foreground hover:opacity-90 flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add New Pet
-            </Button>
-          </div>
-
-          {/* Pets Grid */}
-          {petsLoading ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-48 w-full" />
-              ))}
-            </div>
-          ) : pets?.pets && pets.pets.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pets.pets.map((pet) => (
-                <Card key={pet.id} className="overflow-hidden border border-border hover:shadow-lg transition-shadow">
-                  {/* Pet Image */}
-                  <div className="w-full h-40 bg-muted/20 flex items-center justify-center text-5xl overflow-hidden">
-                    {pet.imageUrl ? (
-                      <img
-                        src={pet.imageUrl}
-                        alt={pet.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      "🐾"
-                    )}
-                  </div>
-
-                  {/* Pet Info */}
-                  <div className="p-4 space-y-3">
-                    <div>
-                      <h3 className="font-bold text-lg">{pet.name}</h3>
-                      <p className="text-sm text-muted">{pet.breed || pet.species}</p>
-                    </div>
-
-                    <div className="text-sm space-y-1">
-                      <p className="text-muted">
-                        {pet.age ? `${Math.floor(pet.age / 12)} years • ` : ""}
-                        {pet.gender}
-                      </p>
-                      <p className="text-muted capitalize">
-                        Status: <span className="font-semibold text-foreground">{pet.status}</span>
-                      </p>
-                      {pet.adoptionFee && (
-                        <p className="text-muted">
-                          Fee: <span className="font-semibold text-foreground">${pet.adoptionFee}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {pet.description && (
-                      <p className="text-sm text-muted line-clamp-2">{pet.description}</p>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 pt-2 border-t border-border">
-                      <Button
-                        onClick={() => handleOpenEditForm(pet.id)}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 flex items-center gap-1 justify-center"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                        Edit
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Are you sure you want to delete ${pet.name}? This action cannot be undone.`
-                            )
-                          ) {
-                            deletePetMutation.mutate({ id: pet.id });
-                          }
-                        }}
-                        disabled={deletePetMutation.isPending}
-                        variant="destructive"
-                        size="sm"
-                        className="flex-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-card border border-border rounded-lg">
-              <p className="text-lg text-muted mb-4">No pets found</p>
-              <Button onClick={handleOpenCreateForm} className="bg-accent text-accent-foreground">
-                Add Your First Pet
-              </Button>
-            </div>
+        {/* ── Search ───────────────────────────────────────────────────────── */}
+        <div className="relative mb-6 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by name or species…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={`${inp} pl-9`}
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-900 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
           )}
         </div>
-      </div>
 
-      {/* Pet Form Modal */}
-      <PetFormModal
-        isOpen={petFormOpen}
-        onClose={handleCloseForm}
-        onSubmit={handlePetFormSubmit}
-        initialData={
-          editingPet
-            ? {
-                name: editingPet.name,
-                species: editingPet.species,
-                breed: editingPet.breed || "",
-                age: editingPet.age ?? undefined,
-                gender: editingPet.gender as "male" | "female" | "unknown",
-                description: editingPet.description || "",
-                imageUrl: editingPet.imageUrl || "",
-                adoptionFee: editingPet.adoptionFee ? editingPet.adoptionFee.toString() : "",
-                status: editingPet.status as "available" | "adopted" | "pending",
-              }
-            : undefined
-        }
-        isLoading={createPetMutation.isPending || updatePetMutation.isPending}
-        title={editingPetId ? "Edit Pet" : "Add New Pet"}
-      />
-    </AdminLayout>
+        {/* ── Error ────────────────────────────────────────────────────────── */}
+        {error && <p className="text-red-500 mb-4 text-sm">{error}</p>}
+
+        {/* ── Grid ─────────────────────────────────────────────────────────── */}
+        {isLoading ? (
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
+                <div className="h-40 bg-gray-100" />
+                <div className="p-4 space-y-2">
+                  <div className="h-4 w-3/4 bg-gray-100 rounded" />
+                  <div className="h-3 w-1/2 bg-gray-100 rounded" />
+                  <div className="h-8 w-full bg-gray-100 rounded mt-3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-20 border border-dashed border-gray-200 rounded-2xl bg-white">
+            <p className="text-5xl mb-4">🐾</p>
+            <p className="text-gray-600 mb-4">
+              {search ? "No pets match your search." : "No pets yet."}
+            </p>
+            {!search && (
+              <button 
+                onClick={openCreate} 
+                className="px-7 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all"
+              >
+                Add Your First Pet
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filtered.map((pet) => (
+              <div key={pet.id} className="rounded-2xl border border-gray-100 overflow-hidden bg-white hover:shadow-lg transition-shadow flex flex-col">
+                {/* Image */}
+                <div className="relative h-40 bg-gray-50 flex-shrink-0">
+                  {pet.imageUrl
+                    ? <img src={pet.imageUrl} alt={pet.name} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center text-4xl">🐾</div>}
+                  {/* Status dot */}
+                  <span className={`absolute top-2 right-2 w-3 h-3 rounded-full border-2 border-white ${STATUS_DOT[pet.status]}`} title={pet.status} />
+                </div>
+                {/* Info */}
+                <div className="p-4 flex flex-col flex-1">
+                  <p className="font-bold text-gray-900 truncate">{pet.name}</p>
+                  <p className="text-xs text-gray-600 capitalize mb-1">{pet.species}{pet.breed ? ` · ${pet.breed}` : ""}</p>
+                  <div className="text-xs text-gray-600 space-y-0.5 mb-3">
+                    {pet.age != null && <p>{Math.floor(pet.age / 12)} yr{Math.floor(pet.age / 12) !== 1 ? "s" : ""} {pet.age % 12}m · {pet.gender ?? "—"}</p>}
+                    {pet.adoptionFee && <p>Fee: ${pet.adoptionFee}</p>}
+                    <p className="capitalize font-medium text-gray-900">{pet.status}</p>
+                  </div>
+                  {/* Actions */}
+                  <div className="flex gap-2 mt-auto">
+                    <button
+                      onClick={() => openEdit(pet)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 hover:border-amber-300 hover:text-amber-600 transition-colors"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" /> Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(pet)}
+                      disabled={deleting === pet.id}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-50 text-red-600 border border-red-200 text-sm hover:bg-red-100 disabled:opacity-50 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      {deleting === pet.id ? "…" : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* ── Slide-in Form Panel ───────────────────────────────────────────────── */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div className="flex-1 bg-black/70 backdrop-blur-sm" onClick={closeForm} />
+          {/* Panel */}
+          <div className="w-full max-w-lg z-10 bg-white border-l border-gray-200 shadow-2xl overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="font-bold text-lg text-gray-900">{editing ? `Edit ${editing.name}` : "Add New Pet"}</h2>
+              <button onClick={closeForm} className="text-gray-400 hover:text-gray-900 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="p-6 space-y-4">
+              {/* Name + Species */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Name *</label>
+                  <input value={form.name} onChange={set("name")} required placeholder="Buddy" className={inp} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Species *</label>
+                  <input value={form.species} onChange={set("species")} required placeholder="dog" className={inp} />
+                </div>
+              </div>
+
+              {/* Breed + Age */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Breed</label>
+                  <input value={form.breed ?? ""} onChange={set("breed")} placeholder="Labrador" className={inp} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Age (months)</label>
+                  <input
+                    type="number" min={0}
+                    value={form.age ?? ""}
+                    onChange={(e) => setForm((f) => ({ ...f, age: e.target.value ? Number(e.target.value) : undefined }))}
+                    placeholder="24"
+                    className={inp}
+                  />
+                </div>
+              </div>
+
+              {/* Gender + Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Gender</label>
+                  <select value={form.gender ?? "unknown"} onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value as Gender }))} className={inp}>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="unknown">Unknown</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1.5 block">Status</label>
+                  <select value={form.status ?? "available"} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as PetStatus }))} className={inp}>
+                    <option value="available">Available</option>
+                    <option value="pending">Pending</option>
+                    <option value="adopted">Adopted</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Adoption fee */}
+              <div>
+                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Adoption Fee ($)</label>
+                <input
+                  type="number" min={0} step={0.01}
+                  value={form.adoptionFee ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, adoptionFee: e.target.value ? Number(e.target.value) : undefined }))}
+                  placeholder="150.00"
+                  className={inp}
+                />
+              </div>
+
+              {/* Image URL */}
+              <div>
+                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Image URL</label>
+                <input value={form.imageUrl ?? ""} onChange={set("imageUrl")} placeholder="https://…" className={inp} />
+                {form.imageUrl && (
+                  <img src={form.imageUrl} alt="preview" className="mt-2 w-full h-32 object-cover rounded-xl" onError={(e) => (e.currentTarget.style.display = "none")} />
+                )}
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Description</label>
+                <textarea value={form.description ?? ""} onChange={set("description")} rows={3} placeholder="Tell adopters about this pet…" className={inp} />
+              </div>
+
+              {/* Submit */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 px-7 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : editing ? "Save Changes" : "Add Pet"}
+                </button>
+                <button
+                  type="button"
+                  onClick={closeForm}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:border-amber-300 hover:text-amber-600 font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

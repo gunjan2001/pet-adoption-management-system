@@ -1,184 +1,292 @@
-import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+// src/pages/AdminApplications.tsx
+import { useState } from "react";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { useAllApplications } from "@/hooks/useAdoptions";
+import { adoptionsApi } from "@/lib/api/adoptions.api";
+import { getErrorMessage } from "@/lib/errorHandler";
 import { toast } from "sonner";
-import { CheckCircle, XCircle } from "lucide-react";
-import AdminLayout from "@/components/AdminLayout";
+import { ArrowLeft, CheckCircle, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import type { AdoptionStatus, ApplicationWithPetAndApplicant } from "@/types";
+
+const STATUS_STYLES: Record<AdoptionStatus, string> = {
+  pending:  "bg-amber-100 text-amber-800",
+  approved: "bg-green-100 text-green-800",
+  rejected: "bg-red-100 text-red-800",
+};
 
 export default function AdminApplications() {
-  const { user, isAuthenticated } = useAuth();
-  const [, setLocation] = useLocation();
+  const { logout } = useAuth();
+  const [, navigate] = useLocation();
 
-  // Redirect if not admin
-  useEffect(() => {
-    if (!isAuthenticated || user?.role !== "admin") {
-      setLocation("/");
-    }
-  }, [isAuthenticated, user?.role, setLocation]);
+  // ── Filters + Pagination ──────────────────────────────────────────────────
+  const [statusFilter, setStatusFilter] = useState<AdoptionStatus | "all">("all");
+  const [page, setPage] = useState(1);
+  const LIMIT = 10;
 
-  // Queries
-  const { data: applications, isLoading: appsLoading, refetch: refetchApps } = trpc.applications.allApplications.useQuery(
-    {
-      page: 1,
-      limit: 50,
-    },
-    {
-      staleTime: 1000 * 60,
-      enabled: isAuthenticated && user?.role === "admin",
-    }
-  );
-
-  // Mutations
-  const approveMutation = trpc.applications.approve.useMutation({
-    onSuccess: () => {
-      toast.success("Application approved");
-      void refetchApps();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
+  const { applications, totalPages, isLoading, error, refetch } = useAllApplications({
+    status: statusFilter === "all" ? undefined : statusFilter,
+    page,
+    limit: LIMIT,
   });
 
-  const rejectMutation = trpc.applications.reject.useMutation({
-    onSuccess: () => {
-      toast.success("Application rejected");
-      void refetchApps();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
+  // ── Review dialog state ───────────────────────────────────────────────────
+  const [reviewing,   setReviewing]   = useState<ApplicationWithPetAndApplicant | null>(null);
+  const [decision,    setDecision]    = useState<"approved" | "rejected">("approved");
+  const [adminNotes,  setAdminNotes]  = useState("");
+  const [submitting,  setSubmitting]  = useState(false);
 
-  if (!isAuthenticated || user?.role !== "admin") {
-    return null;
-  }
+  const openReview = (row: ApplicationWithPetAndApplicant) => {
+    setReviewing(row);
+    setDecision("approved");
+    setAdminNotes("");
+  };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "approved":
-        return "bg-green-100 text-green-800";
-      case "rejected":
-        return "bg-red-100 text-red-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+  const handleReview = async () => {
+    if (!reviewing) return;
+    setSubmitting(true);
+    try {
+      await adoptionsApi.review(reviewing.application.id, {
+        status:     decision,
+        adminNotes: adminNotes.trim() || undefined,
+      });
+      toast.success(`Application ${decision}`);
+      setReviewing(null);
+      refetch();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  const inp = "w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm transition-all";
+
   return (
-    <AdminLayout activeTab="applications">
-      <div className="py-8 md:py-12">
-        <div className="container">
-          {/* Page Title */}
-          <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-black">Adoption Applications</h1>
-            <p className="text-muted mt-2">Review and manage adoption applications</p>
+    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white">
+
+      <main className="container mx-auto px-4 max-w-7xl py-8">
+
+        {/* ── Title ────────────────────────────────────────────────────────── */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-black text-gray-900">Adoption Applications</h1>
+          <p className="text-gray-600 mt-1">Review and manage all adoption requests</p>
+        </div>
+
+        {/* ── Status filter tabs ───────────────────────────────────────────── */}
+        <div className="flex gap-2 mb-6 flex-wrap">
+          {(["all", "pending", "approved", "rejected"] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => { setStatusFilter(s); setPage(1); }}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold capitalize transition-all ${
+                statusFilter === s
+                  ? "bg-amber-500 text-white shadow-md"
+                  : "bg-white border border-gray-200 text-gray-700 hover:border-amber-300 hover:text-amber-600"
+              }`}
+            >
+              {s === "all" ? "All" : s}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Error ────────────────────────────────────────────────────────── */}
+        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
+        {/* ── List ─────────────────────────────────────────────────────────── */}
+        {isLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-24 rounded-2xl bg-gray-100 animate-pulse" />
+            ))}
           </div>
 
-          {appsLoading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-32 w-full" />
-              ))}
-            </div>
-          ) : applications?.applications && applications.applications.length > 0 ? (
-            <div className="space-y-4">
-              {applications.applications.map((app) => (
-                <Card key={app.id} className="p-6 border border-border hover:border-accent/50 transition-colors">
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-between">
+        ) : applications.length === 0 ? (
+          <div className="text-center py-20 border border-dashed border-gray-200 rounded-2xl bg-white">
+            <p className="text-4xl mb-3">📋</p>
+            <p className="text-gray-600">No applications found.</p>
+          </div>
+
+        ) : (
+          <div className="space-y-3">
+            {applications.map(({ application, pet, applicant }) => (
+              <div
+                key={application.id}
+                className="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-lg transition-shadow"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+
+                  {/* Pet thumbnail */}
+                  <div className="w-12 h-12 rounded-xl bg-gray-50 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                    {pet.imageUrl
+                      ? <img src={pet.imageUrl} alt={pet.name} className="w-full h-full object-cover" />
+                      : <span className="text-xl">🐾</span>}
+                  </div>
+
+                  {/* Main info */}
+                  <div className="flex-1 min-w-0 space-y-3">
+                    {/* Top row */}
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div>
-                        <h3 className="text-lg font-bold">{app.fullName}</h3>
-                        <p className="text-sm text-muted">
-                          Application #{app.id} • Pet #{app.petId}
+                        <p className="font-bold text-gray-900">
+                          {applicant.name ?? applicant.email}
+                          <span className="text-gray-400 font-normal mx-2">→</span>
+                          {pet.name}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          App #{application.id} · {applicant.email} · {new Date(application.createdAt).toLocaleDateString()}
                         </p>
                       </div>
-                      <Badge className={`${getStatusColor(app.status)} border-0`}>
-                        {app.status.toUpperCase()}
-                      </Badge>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${STATUS_STYLES[application.status]}`}>
+                        {application.status}
+                      </span>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted">Email</p>
-                        <p className="font-semibold">{app.email}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted">Phone</p>
-                        <p className="font-semibold">{app.phone}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted">Address</p>
-                        <p className="font-semibold">{app.address}</p>
-                      </div>
+                    {/* Contact row */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      <div><p className="text-gray-600 mb-0.5">Phone</p><p className="font-medium text-gray-900">{application.phone}</p></div>
+                      <div><p className="text-gray-600 mb-0.5">Address</p><p className="font-medium text-gray-900 truncate">{application.address}</p></div>
+                      {application.homeType && <div><p className="text-gray-600 mb-0.5">Home</p><p className="font-medium text-gray-900 capitalize">{application.homeType}</p></div>}
+                      <div><p className="text-gray-600 mb-0.5">Has Yard</p><p className="font-medium text-gray-900">{application.hasYard ? "Yes" : "No"}</p></div>
                     </div>
 
-                    {app.reason && (
-                      <div>
-                        <p className="text-sm text-muted mb-1">Why they want to adopt</p>
-                        <p className="text-sm">{app.reason}</p>
+                    {/* Reason */}
+                    {application.reason && (
+                      <div className="bg-amber-50/60 rounded-xl px-3 py-2 text-xs">
+                        <span className="text-gray-700 font-medium">Reason: </span>
+                        <span className="text-gray-600">{application.reason}</span>
                       </div>
                     )}
 
-                    {app.experience && (
-                      <div>
-                        <p className="text-sm text-muted mb-1">Pet Experience</p>
-                        <p className="text-sm">{app.experience}</p>
+                    {/* Admin notes (resolved) */}
+                    {application.adminNotes && application.status !== "pending" && (
+                      <div className={`rounded-xl px-3 py-2 text-xs ${STATUS_STYLES[application.status]}`}>
+                        <span className="font-medium">Note: </span>{application.adminNotes}
                       </div>
                     )}
 
-                    {app.status === "pending" && (
-                      <div className="flex gap-3 pt-4 border-t border-border">
-                        <Button
-                          onClick={() =>
-                            approveMutation.mutate({
-                              id: app.id,
-                              adminNotes: "Application approved",
-                            })
-                          }
-                          disabled={approveMutation.isPending}
-                          className="flex-1 bg-green-600 text-white hover:bg-green-700 flex items-center gap-2"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Approve
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            const reason = prompt("Enter rejection reason:");
-                            if (reason) {
-                              rejectMutation.mutate({
-                                id: app.id,
-                                adminNotes: reason,
-                              });
-                            }
-                          }}
-                          disabled={rejectMutation.isPending}
-                          variant="destructive"
-                          className="flex-1 flex items-center gap-2"
-                        >
-                          <XCircle className="w-4 h-4" />
-                          Reject
-                        </Button>
-                      </div>
+                    {/* Review button */}
+                    {application.status === "pending" && (
+                      <button
+                        onClick={() => openReview({ application, pet, applicant })}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-md shadow-amber-200 transition-all"
+                      >
+                        Review Application
+                      </button>
                     )}
                   </div>
-                </Card>
-              ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Pagination ───────────────────────────────────────────────────── */}
+        {!isLoading && totalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 mt-8">
+            <button
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page === 1}
+              className="flex items-center gap-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-700 hover:border-amber-300 hover:text-amber-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" /> Prev
+            </button>
+            <span className="text-sm text-gray-600">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page === totalPages}
+              className="flex items-center gap-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-700 hover:border-amber-300 hover:text-amber-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </main>
+
+      {/* ── Review Dialog ─────────────────────────────────────────────────────── */}
+      {reviewing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setReviewing(null)} />
+          <div className="relative z-10 bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-md p-6 space-y-5">
+
+            <h2 className="font-bold text-lg text-gray-900">Review Application</h2>
+
+            {/* Summary */}
+            <div className="bg-amber-50/60 rounded-xl p-4 text-sm space-y-1.5">
+              <p><span className="text-gray-600">Applicant:</span> <span className="font-medium text-gray-900">{reviewing.applicant.name ?? reviewing.applicant.email}</span></p>
+              <p><span className="text-gray-600">Pet:</span> <span className="font-medium text-gray-900">{reviewing.pet.name} ({reviewing.pet.species})</span></p>
+              <p><span className="text-gray-600">Email:</span> <span className="font-medium text-gray-900">{reviewing.application.email}</span></p>
+              {reviewing.application.reason && (
+                <p className="pt-1.5 border-t border-gray-200"><span className="text-gray-600">Reason:</span> <span className="text-gray-900">{reviewing.application.reason}</span></p>
+              )}
             </div>
-          ) : (
-            <div className="text-center py-12 bg-card border border-border rounded-lg">
-              <p className="text-lg text-muted">No applications found</p>
+
+            {/* Decision */}
+            <div>
+              <p className="text-xs font-medium text-gray-700 mb-2">Decision *</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDecision("approved")}
+                  className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    decision === "approved"
+                      ? "border-green-500 bg-green-50 text-green-700"
+                      : "border-gray-200 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  <CheckCircle className="w-4 h-4" /> Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDecision("rejected")}
+                  className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    decision === "rejected"
+                      ? "border-red-500 bg-red-50 text-red-700"
+                      : "border-gray-200 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  <XCircle className="w-4 h-4" /> Reject
+                </button>
+              </div>
             </div>
-          )}
+
+            {/* Admin notes */}
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1.5 block">Note for applicant (optional)</label>
+              <textarea
+                value={adminNotes}
+                onChange={(e) => setAdminNotes(e.target.value)}
+                rows={3}
+                placeholder={decision === "approved" ? "e.g. We will contact you shortly to arrange a meetup." : "e.g. Unfortunately we found a better match for this pet."}
+                className={inp}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleReview}
+                disabled={submitting}
+                className={`flex-1 px-7 py-3 rounded-2xl font-bold text-sm shadow-lg disabled:opacity-50 transition-all ${
+                  decision === "approved"
+                    ? "bg-green-600 hover:bg-green-700 text-white shadow-green-200"
+                    : "bg-red-600 hover:bg-red-700 text-white shadow-red-200"
+                }`}
+              >
+                {submitting ? "Saving…" : decision === "approved" ? "Confirm Approval" : "Confirm Rejection"}
+              </button>
+              <button
+                onClick={() => setReviewing(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:border-amber-300 hover:text-amber-600 font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </AdminLayout>
+      )}
+    </div>
   );
 }

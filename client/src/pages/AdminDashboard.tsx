@@ -1,394 +1,176 @@
-import { useState, useMemo } from "react";
-import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+// src/pages/AdminDashboard.tsx
+import { useMemo } from "react";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "sonner";
-import { Plus, Trash2, CheckCircle, XCircle, Edit2 } from "lucide-react";
-import PetFormModal from "@/components/PetFormModal";
-import AdminHeader from "@/components/AdminHeader";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { usePets } from "@/hooks/usePets";
+import { useAllApplications } from "@/hooks/useAdoptions";
+import { LayoutGrid, PawPrint, ClipboardList, LogOut } from "lucide-react";
 
 export default function AdminDashboard() {
-  const { user, isAuthenticated } = useAuth();
-  const [, setLocation] = useLocation();
-  const [activeTab, setActiveTab] = useState("applications");
-  const [petFormOpen, setPetFormOpen] = useState(false);
-  const [editingPetId, setEditingPetId] = useState<number | null>(null);
+  const { user, logout } = useAuth();
+  const [, navigate]     = useLocation();
 
-  // Redirect if not admin
-  useEffect(() => {
-    if (!isAuthenticated || user?.role !== "admin") {
-      setLocation("/");
-    }
-  }, [isAuthenticated, user?.role, setLocation]);
+  // Fetch full sets for stats — high limit, page 1
+  const { pets,         isLoading: petsLoading }  = usePets({ limit: 500, page: 1 });
+  const { applications, isLoading: appsLoading }  = useAllApplications({ limit: 500, page: 1 });
 
-  // Queries with proper configuration
-  const { data: applications, isLoading: appsLoading, refetch: refetchApps } = trpc.applications.allApplications.useQuery(
-    {
-      page: 1,
-      limit: 50,
-    },
-    {
-      staleTime: 1000 * 60, // 1 minute
-      enabled: isAuthenticated && user?.role === "admin", // Only fetch if admin
-    }
-  );
-  const { data: pets, isLoading: petsLoading, refetch: refetchPets } = trpc.pets.list.useQuery(
-    {
-      page: 1,
-      limit: 50,
-    },
-    {
-      staleTime: 1000 * 60, // 1 minute
-      enabled: isAuthenticated && user?.role === "admin", // Only fetch if admin
-    }
+  const stats = useMemo(() => ({
+    total:     pets.length,
+    available: pets.filter((p) => p.status === "available").length,
+    pending:   pets.filter((p) => p.status === "pending").length,
+    adopted:   pets.filter((p) => p.status === "adopted").length,
+    totalApps: applications.length,
+    pendingApps:  applications.filter((a) => a.application.status === "pending").length,
+    approvedApps: applications.filter((a) => a.application.status === "approved").length,
+    rejectedApps: applications.filter((a) => a.application.status === "rejected").length,
+  }), [pets, applications]);
+
+  const recentApps = useMemo(
+    () => [...applications]
+      .sort((a, b) => new Date(b.application.createdAt).getTime() - new Date(a.application.createdAt).getTime())
+      .slice(0, 6),
+    [applications]
   );
 
-  // Get editing pet data
-  const editingPet = useMemo(() => {
-    if (!editingPetId || !pets?.pets) return undefined;
-    return pets.pets.find(p => p.id === editingPetId);
-  }, [editingPetId, pets?.pets]);
+  const Loading = () => (
+    <div className="h-8 w-16 rounded bg-gray-100 animate-pulse mx-auto" />
+  );
 
-  // Mutations
-  const approveMutation = trpc.applications.approve.useMutation({
-    onSuccess: () => {
-      toast.success("Application approved");
-      refetchApps();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const rejectMutation = trpc.applications.reject.useMutation({
-    onSuccess: () => {
-      toast.success("Application rejected");
-      refetchApps();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const createPetMutation = trpc.pets.create.useMutation({
-    onSuccess: () => {
-      toast.success("Pet added successfully");
-      refetchPets();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const updatePetMutation = trpc.pets.update.useMutation({
-    onSuccess: () => {
-      toast.success("Pet updated successfully");
-      refetchPets();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const deletePetMutation = trpc.pets.delete.useMutation({
-    onSuccess: () => {
-      toast.success("Pet deleted");
-      refetchPets();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  if (!isAuthenticated || user?.role !== "admin") {
-    return null;
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "approved":
-        return "bg-green-100 text-green-800";
-      case "rejected":
-        return "bg-red-100 text-red-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const handlePetFormSubmit = async (data: any) => {
-    if (editingPetId) {
-      await updatePetMutation.mutateAsync({
-        id: editingPetId,
-        data: {
-          ...data,
-          age: data.age ? parseInt(data.age) : undefined,
-          adoptionFee: data.adoptionFee ? parseFloat(data.adoptionFee) : undefined,
-        },
-      });
-    } else {
-      await createPetMutation.mutateAsync({
-        ...data,
-        age: data.age ? parseInt(data.age) : undefined,
-        adoptionFee: data.adoptionFee ? parseFloat(data.adoptionFee) : undefined,
-      });
-    }
-    setPetFormOpen(false);
-    setEditingPetId(null);
-  };
-
-  const handleOpenCreateForm = () => {
-    setEditingPetId(null);
-    setPetFormOpen(true);
-  };
-
-  const handleOpenEditForm = (petId: number) => {
-    setEditingPetId(petId);
-    setPetFormOpen(true);
-  };
-
-  const handleCloseForm = () => {
-    setPetFormOpen(false);
-    setEditingPetId(null);
-  };
+  const statCards = [
+    { label: "Total Pets",      value: stats.total,       color: "text-blue-600",   bg: "bg-blue-50"   },
+    { label: "Available",       value: stats.available,   color: "text-green-600",  bg: "bg-green-50"  },
+    { label: "Pending Adoption",value: stats.pending,     color: "text-amber-600",  bg: "bg-amber-50"  },
+    { label: "Adopted",         value: stats.adopted,     color: "text-gray-600",   bg: "bg-gray-50"   },
+    { label: "Total Apps",      value: stats.totalApps,   color: "text-purple-600", bg: "bg-purple-50" },
+    { label: "Pending Review",  value: stats.pendingApps, color: "text-orange-600", bg: "bg-orange-50" },
+  ];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Admin Header */}
-      <AdminHeader activeTab={activeTab} />
+    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white">
 
-      {/* Main Content */}
-      <div className="py-8 md:py-12">
-        <div className="container">
-          {/* Page Title */}
-          <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-black">Dashboard</h1>
-            <p className="text-muted mt-2">Manage pets and adoption applications</p>
+      <main className="container mx-auto px-4 max-w-7xl py-8">
+
+        {/* ── Page title ───────────────────────────────────────────────────── */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-black text-gray-900">Dashboard Overview</h1>
+          <p className="text-gray-600 mt-1">
+            Welcome back, {user?.name ?? user?.email}
+          </p>
+        </div>
+
+        {/* ── Stat cards ───────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
+          {statCards.map((s) => (
+            <div key={s.label} className={`${s.bg} rounded-2xl p-4 text-center border border-gray-100`}>
+              {petsLoading || appsLoading ? (
+                <Loading />
+              ) : (
+                <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
+              )}
+              <p className="text-xs text-gray-600 mt-1 leading-tight font-medium">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Quick actions ────────────────────────────────────────────────── */}
+        <div className="grid md:grid-cols-2 gap-5 mb-10">
+          <div className="border border-gray-100 rounded-2xl p-6 bg-white hover:shadow-lg transition-shadow">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                <PawPrint className="w-5 h-5 text-blue-600" />
+              </div>
+              <h2 className="font-bold text-lg text-gray-900">Manage Pets</h2>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Add new pets, update details, change status, or remove listings.
+            </p>
+            <button
+              onClick={() => navigate("/admin/pets")}
+              className="w-full px-7 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all"
+            >
+              Go to Pet Management →
+            </button>
           </div>
 
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            {/* Applications Tab */}
-            <TabsContent value="applications" className="space-y-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Adoption Applications</h2>
-                <Badge variant="outline">{applications?.applications?.length || 0}</Badge>
+          <div className="border border-gray-100 rounded-2xl p-6 bg-white hover:shadow-lg transition-shadow">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                <ClipboardList className="w-5 h-5 text-orange-600" />
               </div>
-
-              {appsLoading ? (
-                <div className="space-y-4">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-32 w-full" />
-                  ))}
-                </div>
-              ) : applications?.applications && applications.applications.length > 0 ? (
-                <div className="space-y-4">
-                  {applications.applications.map((app) => (
-                    <Card key={app.id} className="p-6 border border-border hover:border-accent/50 transition-colors">
-                      <div className="space-y-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="text-lg font-bold">
-                              {app.fullName}
-                            </h3>
-                            <p className="text-sm text-muted">
-                              Application #{app.id} • Pet #{app.petId}
-                            </p>
-                          </div>
-                          <Badge className={`${getStatusColor(app.status)} border-0`}>
-                            {app.status.toUpperCase()}
-                          </Badge>
-                        </div>
-
-                        <div className="grid md:grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted">Email</p>
-                            <p className="font-semibold">{app.email}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted">Phone</p>
-                          <p className="font-semibold">{app.phone}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted">Address</p>
-                          <p className="font-semibold">{app.address}</p>
-                        </div>
-                      </div>
-
-                      {app.reason && (
-                        <div>
-                          <p className="text-sm text-muted mb-1">Why they want to adopt</p>
-                          <p className="text-sm">{app.reason}</p>
-                        </div>
-                      )}
-
-                      {app.experience && (
-                        <div>
-                          <p className="text-sm text-muted mb-1">Pet Experience</p>
-                          <p className="text-sm">{app.experience}</p>
-                        </div>
-                      )}
-
-                      {app.status === "pending" && (
-                        <div className="flex gap-3 pt-4 border-t border-border">
-                          <Button
-                            onClick={() =>
-                              approveMutation.mutate({
-                                id: app.id,
-                                adminNotes: "Application approved",
-                              })
-                            }
-                            disabled={approveMutation.isPending}
-                            className="flex-1 bg-green-600 text-white hover:bg-green-700 flex items-center gap-2"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Approve
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              const reason = prompt("Enter rejection reason:");
-                              if (reason) {
-                                rejectMutation.mutate({
-                                  id: app.id,
-                                  adminNotes: reason,
-                                });
-                              }
-                            }}
-                            disabled={rejectMutation.isPending}
-                            variant="destructive"
-                            className="flex-1 flex items-center gap-2"
-                          >
-                            <XCircle className="w-4 h-4" />
-                            Reject
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 bg-card border border-border rounded-lg">
-                <p className="text-lg text-muted">No applications found</p>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Pets Tab */}
-          <TabsContent value="pets" className="space-y-6">
-            <Button
-              onClick={handleOpenCreateForm}
-              className="bg-accent text-accent-foreground hover:opacity-90 flex items-center gap-2"
+              <h2 className="font-bold text-lg text-gray-900">Review Applications</h2>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              {stats.pendingApps > 0
+                ? `${stats.pendingApps} application(s) are waiting for your review.`
+                : "No pending applications right now."}
+            </p>
+            <button
+              onClick={() => navigate("/admin/applications")}
+              className="w-full px-7 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all"
             >
-              <Plus className="w-4 h-4" />
-              Add New Pet
-            </Button>
+              Go to Applications →
+            </button>
+          </div>
+        </div>
 
-            {petsLoading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={i} className="h-48 w-full" />
-                ))}
-              </div>
-            ) : pets?.pets && pets.pets.length > 0 ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {pets.pets.map((pet) => (
-                  <Card key={pet.id} className="overflow-hidden border border-border">
-                    {/* Pet Image */}
-                    <div className="w-full h-32 bg-muted/20 flex items-center justify-center text-4xl">
-                      {pet.imageUrl ? (
-                        <img
-                          src={pet.imageUrl}
-                          alt={pet.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        "🐾"
-                      )}
-                    </div>
+        {/* ── Recent applications ──────────────────────────────────────────── */}
+        <div className="border border-gray-100 rounded-2xl bg-white overflow-hidden shadow-sm hover:shadow-lg transition-shadow">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="font-bold text-gray-900">Recent Applications</h2>
+            <button
+              onClick={() => navigate("/admin/applications")}
+              className="text-sm text-amber-600 hover:text-amber-700 font-semibold transition-colors"
+            >
+              View all →
+            </button>
+          </div>
 
-                    {/* Pet Info */}
-                    <div className="p-4 space-y-3">
-                      <div>
-                        <h3 className="font-bold">{pet.name}</h3>
-                        <p className="text-sm text-muted">{pet.breed || pet.species}</p>
-                      </div>
+          {appsLoading ? (
+            <div className="p-6 space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-14 rounded-xl bg-gray-100 animate-pulse" />
+              ))}
+            </div>
+          ) : recentApps.length === 0 ? (
+            <div className="p-12 text-center text-gray-600">
+              No applications yet.
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {recentApps.map(({ application, pet, applicant }) => (
+                <div key={application.id} className="flex items-center gap-4 px-6 py-4 hover:bg-amber-50/30 transition-colors">
+                  {/* Pet thumbnail */}
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {pet.imageUrl
+                      ? <img src={pet.imageUrl} alt={pet.name} className="w-full h-full object-cover" />
+                      : <span className="text-lg">🐾</span>}
+                  </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-gray-900 truncate">
+                      {applicant.name ?? applicant.email}
+                      <span className="text-gray-400 font-normal"> → </span>
+                      {pet.name}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      {new Date(application.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {/* Status badge */}
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${
+                    application.status === "pending"  ? "bg-amber-100 text-amber-800" :
+                    application.status === "approved" ? "bg-green-100 text-green-800"  :
+                                                        "bg-red-100 text-red-800"
+                  }`}>
+                    {application.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-                      <div className="text-sm">
-                        <p className="text-muted">
-                          {pet.age ? `${Math.floor(pet.age / 12)} years • ` : ""}
-                          {pet.gender}
-                        </p>
-                        <p className="text-muted capitalize">
-                          Status: {pet.status}
-                        </p>
-                      </div>
-
-                      <div className="flex gap-2 pt-2 border-t border-border">
-                        <Button
-                          onClick={() => handleOpenEditForm(pet.id)}
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 flex items-center gap-1 justify-center"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                          Edit
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            if (confirm("Delete this pet?")) {
-                              deletePetMutation.mutate({ id: pet.id });
-                            }
-                          }}
-                          disabled={deletePetMutation.isPending}
-                          variant="destructive"
-                          size="sm"
-                          className="flex-1"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 bg-card border border-border rounded-lg">
-                <p className="text-lg text-muted">No pets found</p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* Pet Form Modal */}
-      <PetFormModal
-        isOpen={petFormOpen}
-        onClose={handleCloseForm}
-        onSubmit={handlePetFormSubmit}
-        initialData={editingPet ? {
-          name: editingPet.name,
-          species: editingPet.species,
-          breed: editingPet.breed || "",
-          age: editingPet.age ?? undefined,
-          gender: editingPet.gender as "male" | "female" | "unknown",
-          description: editingPet.description || "",
-          imageUrl: editingPet.imageUrl || "",
-          adoptionFee: editingPet.adoptionFee ? editingPet.adoptionFee.toString() : "",
-        } : undefined}
-        isLoading={createPetMutation.isPending || updatePetMutation.isPending}
-        title={editingPetId ? "Edit Pet" : "Add New Pet"}
-      />
-    </div>
+      </main>
     </div>
   );
 }

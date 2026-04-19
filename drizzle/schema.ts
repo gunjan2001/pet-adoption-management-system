@@ -27,8 +27,6 @@ export const users = pgTable("users", {
    * Use this for relations between tables.
    */
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
-  openId: varchar("openId", { length: 64 }).unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }).unique(),
   password: varchar("password", { length: 255 }), // bcrypt hashed password for JWT auth
@@ -70,8 +68,8 @@ export type InsertPet = typeof pets.$inferInsert;
  */
 export const adoptionApplications = pgTable("adoption_applications", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  userId: integer("userId").notNull(),
-  petId: integer("petId").notNull(),
+  userId: integer("userId").notNull().references(()=>users.id),
+  petId: integer("petId").notNull().references(()=>pets.id),
   status: adoptionStatusEnum().default("pending").notNull(),
   fullName: varchar("fullName", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),

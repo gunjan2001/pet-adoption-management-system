@@ -1,47 +1,43 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useLocation, Link } from 'wouter';
-import { RegisterForm } from '@/components/RegisterForm';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import RegisterForm from '@/components/RegisterForm';
+import { useAuth } from '@/_core/hooks/useAuth';
 
 export const RegisterPage: React.FC = () => {
+  const { isAuthenticated, user } = useAuth();
   const [, setLocation] = useLocation();
 
-  const handleRegisterSuccess = (token: string, user: any) => {
-    // Redirect based on user role from the registration result
-    if (user?.role === "admin") {
-      setLocation("/admin");
-    } else {
-      setLocation("/dashboard");
-    }
-  };
+  useEffect(() => {
+    if (!isAuthenticated) return;
 
-  const handleRegisterError = (error: string) => {
-    console.error('Registration error:', error);
-  };
+    const destination = user?.role === 'admin' ? '/admin' : '/dashboard';
+    setLocation(destination);
+  }, [isAuthenticated, user?.role, setLocation]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl">Create Account</CardTitle>
-          <CardDescription>
-            Sign up to start your pet adoption journey
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RegisterForm
-            onSuccess={handleRegisterSuccess}
-            onError={handleRegisterError}
-          />
+    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center px-4 py-12">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-shadow w-full max-w-md">
+        <div className="p-8">
+          <div className="space-y-2 mb-4">
+            <h1 className="text-3xl font-black text-gray-900">Create Account</h1>
+            <p className="text-gray-600 text-sm">
+              Sign up to start your pet adoption journey
+            </p>
+          </div>
 
-          <div className="mt-4 text-center text-sm">
+          <RegisterForm />
+
+          <div className="mt-6 text-center text-sm text-gray-600">
             Already have an account?{' '}
-            <Link href="/login" className="text-blue-600 hover:underline font-medium">
+            <Link 
+              href="/login" 
+              className="text-amber-600 hover:text-amber-700 font-semibold transition-colors"
+            >
               Sign in
             </Link>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

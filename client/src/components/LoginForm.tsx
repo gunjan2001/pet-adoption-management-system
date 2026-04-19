@@ -1,104 +1,162 @@
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { trpc } from '@/lib/trpc';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert } from '@/components/ui/alert';
+// src/components/LoginForm.tsx
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
+import { toast } from "sonner";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { getErrorMessage, getFieldErrors } from "@/lib/errorHandler";
 
-const loginSchema = z.object({
-  email: z.string().email('Valid email is required'),
-  password: z.string().min(1, 'Password is required'),
-});
+// ── Validation functions ───────────────────────────────────────────────────
+const validateEmail = (email: string): string | null => {
+  if (!email.trim()) {
+    return "Email is required";
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return "Please enter a valid email address";
+  }
+  return null;
+};
 
-type LoginFormData = z.infer<typeof loginSchema>;
+const validatePassword = (password: string): string | null => {
+  if (!password) {
+    return "Password is required";
+  }
+  if (password.length < 6) {
+    return "Password must be at least 6 characters long";
+  }
+  return null;
+};
 
-export interface LoginProps {
-  onSuccess?: (token: string, user: any) => void;
-  onError?: (error: string) => void;
-}
+export default function LoginForm() {
+  const { login, isAuthenticated, user } = useAuth();
+  const [, navigate] = useLocation();
 
-export const LoginForm: React.FC<LoginProps> = ({ onSuccess, onError }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const utils = trpc.useUtils();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  });
+  // Field-specific errors
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  const loginMutation = trpc.auth.login.useMutation();
+  useEffect(() => {
+    if (!isAuthenticated) return;
 
-  const onSubmit = async (data: LoginFormData) => {
-    setIsLoading(true);
-    setError(null);
+    const destination = user?.role === "admin" ? "/admin" : "/dashboard";
+    navigate(destination);
+  }, [isAuthenticated, user?.role, navigate]);
 
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+  };
+
+  const handleEmailBlur = () => {
+    setEmailError(validateEmail(email));
+  };
+
+  const handlePasswordBlur = () => {
+    setPasswordError(validatePassword(password));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validate all fields
+    const emailValidation = validateEmail(email);
+    const passwordValidation = validatePassword(password);
+
+    setEmailError(emailValidation);
+    setPasswordError(passwordValidation);
+
+    // If any validation fails, don't submit
+    if (emailValidation || passwordValidation) {
+      return;
+    }
+
+    setLoading(true);
     try {
-      const result = await loginMutation.mutateAsync(data);
-      
-      // Store token in localStorage
-      if (result.token) {
-        localStorage.setItem('authToken', result.token);
-        localStorage.setItem('user', JSON.stringify(result.user));
-        
-        // CRITICAL: Update the auth.me query cache immediately
-        // This ensures useAuth() returns the logged-in user without waiting for refetch
-        utils.auth.me.setData(undefined, result.user as any);
+      await login({ email, password });
+      toast.success("Welcome back!");
+    } catch (err) {
+      // Show backend errors in toast
+      const fields = getFieldErrors(err);
+      if (fields.length > 0) {
+        toast.error(fields.map((f) => f.message).join(" · "));
+      } else {
+        toast.error(getErrorMessage(err));
       }
-
-      onSuccess?.(result.token, result.user);
-    } catch (err: any) {
-      const errorMessage = err.message || 'Login failed';
-      setError(errorMessage);
-      onError?.(errorMessage);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {error && (
-        <Alert variant="destructive">{error}</Alert>
-      )}
+    <div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <label 
+            htmlFor="email" 
+            className="text-sm font-medium text-gray-700"
+          >
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={handleEmailChange}
+            onBlur={handleEmailBlur}
+            placeholder="you@example.com"
+            autoComplete="off"
+            className={`w-full px-4 py-2.5 border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 transition-all ${
+              emailError 
+                ? "border-red-300 focus:ring-red-400" 
+                : "border-gray-200 focus:ring-amber-400"
+            }`}
+          />
+          {emailError && (
+            <p className="text-xs text-red-500 mt-1">{emailError}</p>
+          )}
+        </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="john@example.com"
-          {...register('email')}
-          disabled={isLoading}
-        />
-        {errors.email && (
-          <p className="text-sm text-red-500">{errors.email.message}</p>
-        )}
-      </div>
+        <div className="space-y-1.5">
+          <label 
+            htmlFor="password" 
+            className="text-sm font-medium text-gray-700"
+          >
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={handlePasswordChange}
+            onBlur={handlePasswordBlur}
+            placeholder="••••••••"
+            autoComplete="off"
+            className={`w-full px-4 py-2.5 border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 transition-all ${
+              passwordError 
+                ? "border-red-300 focus:ring-red-400" 
+                : "border-gray-200 focus:ring-amber-400"
+            }`}
+          />
+          {passwordError && (
+            <p className="text-xs text-red-500 mt-1">{passwordError}</p>
+          )}
+        </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          placeholder="••••••"
-          {...register('password')}
-          disabled={isLoading}
-        />
-        {errors.password && (
-          <p className="text-sm text-red-500">{errors.password.message}</p>
-        )}
-      </div>
-
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? 'Signing in...' : 'Sign In'}
-      </Button>
-    </form>
+        <button
+          type="submit"
+          className="w-full px-7 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={loading}
+        >
+          {loading ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
+    </div>
   );
-};
+}
