@@ -15,6 +15,7 @@ import Navigation from "./components/Navigation";
 import { useAuth } from "./_core/hooks/useAuth";
 import { Toaster } from "sonner";
 import NotFound from "./pages/NotFound";
+import Footer from "./components/Footer";
 
 // ── Route Guards ──────────────────────────────────────────────────────────────
 
@@ -107,6 +108,7 @@ function App() {
               <main className="flex-1">
                 <Router />
               </main>
+              <Footer/>
             </div>
           </>
         </ThemeProvider>
