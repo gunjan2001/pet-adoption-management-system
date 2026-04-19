@@ -1,0 +1,220 @@
+name: CI Checks
+
+# Run tests and linting on pull requests and pushes
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  # Job 1: Lint and type-check backend
+  backend-checks:
+    name: Backend Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: |
+          cd server
+          pnpm install --frozen-lockfile
+
+      - name: TypeScript type checking
+        run: |
+          cd server
+          echo "🔍 Running TypeScript type checking..."
+          pnpm exec tsc --noEmit || {
+            echo "❌ TypeScript errors found"
+            exit 1
+          }
+          echo "✅ No type errors found"
+
+      - name: Build
+        run: |
+          cd server
+          echo "🏗️  Building backend..."
+          pnpm run build
+          echo "✅ Build successful"
+
+      - name: Run linter (if configured)
+        run: |
+          cd server
+          # If you have ESLint configured:
+          # pnpm run lint
+          echo "⚠️  Linting not configured yet"
+        continue-on-error: true
+
+      - name: Run tests (if any)
+        run: |
+          cd server
+          # If you have tests:
+          # pnpm test
+          echo "⚠️  Tests not configured yet"
+        continue-on-error: true
+
+  # Job 2: Lint and type-check frontend
+  frontend-checks:
+    name: Frontend Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: |
+          cd client
+          pnpm install --frozen-lockfile
+
+      - name: TypeScript type checking
+        run: |
+          cd client
+          echo "🔍 Running TypeScript type checking..."
+          pnpm exec tsc --noEmit || {
+            echo "❌ TypeScript errors found"
+            exit 1
+          }
+          echo "✅ No type errors found"
+
+      - name: Build
+        run: |
+          cd client
+          echo "🏗️  Building frontend..."
+          pnpm run build
+          echo "✅ Build successful"
+        env:
+          VITE_API_URL: https://api.example.com # Dummy URL for build
+
+      - name: Run linter (if configured)
+        run: |
+          cd client
+          # If you have ESLint configured:
+          # pnpm run lint
+          echo "⚠️  Linting not configured yet"
+        continue-on-error: true
+
+      - name: Run tests (if any)
+        run: |
+          cd client
+          # If you have tests:
+          # pnpm test
+          echo "⚠️  Tests not configured yet"
+        continue-on-error: true
+
+  # Job 3: Security checks
+  security-checks:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Audit backend dependencies
+        run: |
+          cd server
+          echo "🔒 Auditing backend dependencies..."
+          pnpm audit --prod || {
+            echo "⚠️  Vulnerabilities found in backend dependencies"
+            echo "Run 'pnpm audit --prod' locally for details"
+          }
+        continue-on-error: true
+
+      - name: Audit frontend dependencies
+        run: |
+          cd client
+          echo "🔒 Auditing frontend dependencies..."
+          pnpm audit --prod || {
+            echo "⚠️  Vulnerabilities found in frontend dependencies"
+            echo "Run 'pnpm audit --prod' locally for details"
+          }
+        continue-on-error: true
+
+  # Job 4: Check for sensitive data
+  security-scan:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for better scanning
+
+      - name: Run secret detection
+        run: |
+          echo "🔍 Scanning for accidentally committed secrets..."
+          
+          # Check for common secret patterns
+          if grep -r -E "sk_live_|pk_live_|api_key|apikey|API_KEY|APIKEY" --exclude-dir=node_modules --exclude-dir=.git .; then
+            echo "⚠️  Potential secrets found! Please review the matches above."
+            echo "Make sure you're not committing real API keys or secrets."
+            exit 1
+          else
+            echo "✅ No obvious secrets detected"
+          fi
+        continue-on-error: true
+
+  # Job 5: Summary
+  checks-summary:
+    name: CI Summary
+    needs: [backend-checks, frontend-checks, security-checks]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Check results
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📊 CI CHECKS SUMMARY"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Backend Checks:  ${{ needs.backend-checks.result }}"
+          echo "Frontend Checks: ${{ needs.frontend-checks.result }}"
+          echo "Security Checks: ${{ needs.security-checks.result }}"
+          echo ""
+          
+          if [ "${{ needs.backend-checks.result }}" = "success" ] && \
+             [ "${{ needs.frontend-checks.result }}" = "success" ]; then
+            echo "✅ All critical checks passed!"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            exit 0
+          else
+            echo "❌ Some checks failed. Please review the logs."
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            exit 1
+          fi

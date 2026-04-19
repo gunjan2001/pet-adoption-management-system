@@ -1,0 +1,26 @@
+# Render Blueprint Configuration
+# This file allows you to deploy your entire stack with one click
+
+services:
+  # Backend API Service
+  - type: web
+    name: pet-adoption-api
+    runtime: node
+    buildCommand: cd server && pnpm install && pnpm run build
+    startCommand: cd server && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false # Set manually via Render dashboard
+      - key: JWT_SECRET
+        generateValue: true # Render auto-generates secure value
+      - key: CORS_ORIGIN
+        sync: false # Set manually to your Vercel URL
+    healthCheckPath: /api/health # Optional: add health endpoint
+    plan: free # Free tier with auto-sleep
+
+# Database will be set up separately on Neon
+# Just add the DATABASE_URL to your service environment variables

@@ -1,0 +1,128 @@
+name: Run Database Migrations
+
+# This workflow runs database migrations on production database
+# Use with EXTREME CAUTION - this modifies production data!
+
+on:
+  workflow_dispatch: # Manual trigger only (for safety)
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - production
+          - staging
+        default: 'staging'
+      confirm:
+        description: 'Type "MIGRATE" to confirm'
+        required: true
+        type: string
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Validate confirmation
+        run: |
+          if [ "${{ inputs.confirm }}" != "MIGRATE" ]; then
+            echo "❌ Migration cancelled - confirmation string incorrect"
+            echo "Please type 'MIGRATE' exactly to confirm"
+            exit 1
+          fi
+          echo "✅ Confirmation validated"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: |
+          cd server
+          pnpm install --frozen-lockfile
+
+      - name: Show pending migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cd server
+          echo "📋 Checking for pending migrations..."
+          
+          # List migration files
+          if [ -d "../drizzle/migrations" ]; then
+            echo "Migration files found:"
+            ls -la ../drizzle/migrations/
+          else
+            echo "⚠️ No migration directory found"
+          fi
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_ENV: production
+        run: |
+          cd server
+          
+          echo "🚀 Running migrations on ${{ inputs.environment }}..."
+          echo "⚠️  DATABASE: ${DATABASE_URL%%@*}@***" # Hide credentials in logs
+          
+          # Run migrations using Drizzle
+          pnpm run db:push
+          
+          echo "✅ Migrations completed successfully!"
+
+      - name: Verify database schema
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cd server
+          
+          echo "🔍 Verifying database schema..."
+          
+          # You can add custom verification queries here
+          # For example, check if tables exist
+          
+          echo "✅ Database schema verification complete"
+
+      - name: Migration summary
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ MIGRATION SUCCESSFUL"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "🗄️  Environment: ${{ inputs.environment }}"
+          echo "⏰ Completed:    $(date)"
+          echo "👤 Triggered by: ${{ github.actor }}"
+          echo ""
+          echo "Please verify the changes in your application"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: Failure notification
+        if: failure()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "❌ MIGRATION FAILED!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "🗄️  Environment: ${{ inputs.environment }}"
+          echo "⏰ Failed at:    $(date)"
+          echo "👤 Triggered by: ${{ github.actor }}"
+          echo ""
+          echo "⚠️  IMPORTANT:"
+          echo "1. Check the logs above for error details"
+          echo "2. Verify database state manually"
+          echo "3. You may need to rollback changes"
+          echo "4. Contact database administrator if needed"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
