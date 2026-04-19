@@ -1,0 +1,96 @@
+name: Deploy Frontend to Vercel
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'client/**'
+      - 'shared/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+
+      - name: Pull Vercel Environment Information
+        run: |
+          cd client
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        run: |
+          cd client
+          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Deploy to Vercel
+        id: deploy
+        run: |
+          cd client
+          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Deployment URL: $URL"
+
+      - name: Verify deployment
+        run: |
+          DEPLOYMENT_URL="${{ steps.deploy.outputs.url }}"
+          
+          # Wait for deployment to be ready
+          sleep 10
+          
+          # Check if homepage loads
+          response=$(curl -s -o /dev/null -w "%{http_code}" $DEPLOYMENT_URL || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Frontend is live and responding!"
+            exit 0
+          else
+            echo "⚠️ Frontend returned HTTP $response (might still be deploying)"
+            exit 0
+          fi
+
+      - name: Deployment notification
+        if: success()
+        run: |
+          echo "🚀 Frontend successfully deployed to Vercel!"
+          echo "🌐 Live at: ${{ steps.deploy.outputs.url }}"
+          echo "⏰ Deployed at: $(date)"
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `✅ Frontend deployed to Vercel!\n🌐 Preview: ${{ steps.deploy.outputs.url }}`
+            })
+
+      - name: Failure notification
+        if: failure()
+        run: |
+          echo "❌ Frontend deployment failed!"
+          echo "Please check Vercel dashboard for logs"
