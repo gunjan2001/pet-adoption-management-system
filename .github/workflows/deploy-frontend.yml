@@ -55,7 +55,7 @@ jobs:
         id: deploy
         run: |
           cd client
-          URL=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} --local-config ../vercel.json --env VITE_API_URL="${{ secrets.VITE_API_URL }}")
+          URL=$(vercel deploy --prebuilt --prod --yes --token=${{ secrets.VERCEL_TOKEN }} --local-config ../vercel.json --env VITE_API_URL="${{ secrets.VITE_API_URL }}")
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "Deployment URL: $URL"
 
