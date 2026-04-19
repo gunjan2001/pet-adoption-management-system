@@ -97,7 +97,15 @@ export const createPet = async (
   res: Response
 ): Promise<void> => {
   try {
-    const [pet] = await db.insert(pets).values(req.body).returning();
+    const petPayload = {
+      ...req.body,
+      adoptionFee:
+        req.body.adoptionFee !== undefined
+          ? req.body.adoptionFee.toString()
+          : undefined,
+    };
+
+    const [pet] = await db.insert(pets).values(petPayload).returning();
     res.status(201).json({ success: true, message: "Pet created", data: pet });
   } catch (error) {
     console.error("Create pet error:", error);
@@ -128,9 +136,18 @@ export const updatePet = async (
       return;
     }
 
+    const updatedPayload = {
+      ...req.body,
+      adoptionFee:
+        req.body.adoptionFee !== undefined
+          ? req.body.adoptionFee.toString()
+          : undefined,
+      updatedAt: new Date(),
+    };
+
     const [updated] = await db
       .update(pets)
-      .set({ ...req.body, updatedAt: new Date() })
+      .set(updatedPayload)
       .where(eq(pets.id, petId))
       .returning();
 

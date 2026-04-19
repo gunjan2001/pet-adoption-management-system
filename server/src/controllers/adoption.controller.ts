@@ -1,6 +1,7 @@
 // src/controllers/adoption.controller.ts
 import { Request, Response } from "express";
 import { eq, and, sql } from "drizzle-orm";
+import type { AuthRequest } from "../types";
 import db from "../config/db.js";
 import { adoptionApplications, pets, users } from "../db/schema.js";
 import {
@@ -151,7 +152,7 @@ export const getApplicationById = async (
       return;
     }
 
-    const authReq = req as AuthRequest;
+    const authReq = req as unknown as AuthRequest;
     // Regular users can only view their own applications
     if (
       authReq.user.role !== "admin" &&
@@ -318,7 +319,7 @@ export const withdrawApplication = async (
       return;
     }
 
-    const userId = (req as AuthRequest).user.id;
+    const userId = (req as unknown as AuthRequest).user.id;
 
     const [app] = await db
       .select()

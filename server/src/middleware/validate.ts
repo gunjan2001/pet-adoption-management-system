@@ -1,6 +1,6 @@
 // src/middleware/validate.ts
-import { Request, Response, NextFunction } from "express";
-import { ZodSchema, ZodError } from "zod";
+import type { Request, RequestHandler, Response, NextFunction } from "express";
+import { ZodType, ZodError } from "zod";
 
 /** Format Zod errors into our standard { field, message } shape */
 const formatErrors = (err: ZodError) =>
@@ -19,7 +19,7 @@ const formatErrors = (err: ZodError) =>
  * Usage:  router.post("/register", validateBody(registerSchema), register)
  */
 export const validateBody =
-  <T>(schema: ZodSchema<T>) =>
+  <T>(schema: ZodType<T, any, any>) =>
   (req: Request, res: Response, next: NextFunction): void => {
     const result = schema.safeParse(req.body);
 
@@ -46,8 +46,8 @@ export const validateBody =
  * Usage:  router.get("/pets", validateQuery(paginationSchema), getAllPets)
  */
 export const validateQuery =
-  <T>(schema: ZodSchema<T>) =>
-  (req: Request, res: Response, next: NextFunction): void => {
+  <T extends Record<string, any>>(schema: ZodType<T, any, any>): RequestHandler<{}, any, any, T> =>
+  (req, res, next): void => {
     const result = schema.safeParse(req.query);
 
     if (!result.success) {
@@ -60,6 +60,6 @@ export const validateQuery =
     }
 
     // Cast needed because req.query is typed as ParsedQs (read-only in TS)
-    (req as Request & { query: T }).query = result.data as T;
+    (req as Request<{}, any, any, T>).query = result.data as T;
     next();
   };
