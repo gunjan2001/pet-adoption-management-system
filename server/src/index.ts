@@ -18,7 +18,7 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "http://localhost:5173")
 
 app.use(
   cors({
-    origin: (origin, cb) => {
+    origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
       // Allow requests with no origin (curl, Postman, mobile apps in dev)
       if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
       cb(new Error(`CORS: origin '${origin}' not allowed`));

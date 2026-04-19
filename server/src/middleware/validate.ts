@@ -47,7 +47,7 @@ export const validateBody =
  */
 export const validateQuery =
   <T extends Record<string, any>>(schema: ZodType<T, any, any>): RequestHandler<{}, any, any, T> =>
-  (req, res, next): void => {
+  (req: Request, res: Response, next: NextFunction): void => {
     const result = schema.safeParse(req.query);
 
     if (!result.success) {
