@@ -36,21 +36,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
+          cache: 'npm'
+          cache-dependency-path: 'server/package-lock.json'
 
       - name: Install dependencies
         run: |
           cd server
-          pnpm install --frozen-lockfile
+          npm ci
 
       - name: Show pending migrations
         env:
@@ -78,7 +74,7 @@ jobs:
           echo "⚠️  DATABASE: ${DATABASE_URL%%@*}@***" # Hide credentials in logs
           
           # Run migrations using Drizzle
-          pnpm run db:push
+          npm run db:push
           
           echo "✅ Migrations completed successfully!"
 
