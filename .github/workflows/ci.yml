@@ -21,27 +21,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
+          cache: 'npm'
+          cache-dependency-path: 'server/package-lock.json'
 
       - name: Install dependencies
         run: |
           cd server
-          pnpm install --frozen-lockfile
+          npm ci
 
       - name: TypeScript type checking
         run: |
           cd server
           echo "🔍 Running TypeScript type checking..."
-          pnpm exec tsc --noEmit || {
+          npx tsc --noEmit || {
             echo "❌ TypeScript errors found"
             exit 1
           }
@@ -51,14 +47,14 @@ jobs:
         run: |
           cd server
           echo "🏗️  Building backend..."
-          pnpm run build
+          npm run build
           echo "✅ Build successful"
 
       - name: Run linter (if configured)
         run: |
           cd server
           # If you have ESLint configured:
-          # pnpm run lint
+          # npm run lint
           echo "⚠️  Linting not configured yet"
         continue-on-error: true
 
@@ -66,7 +62,7 @@ jobs:
         run: |
           cd server
           # If you have tests:
-          # pnpm test
+          # npm test
           echo "⚠️  Tests not configured yet"
         continue-on-error: true
 
@@ -79,27 +75,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
+          cache: 'npm'
+          cache-dependency-path: 'client/package-lock.json'
 
       - name: Install dependencies
         run: |
           cd client
-          pnpm install --frozen-lockfile
+          npm ci
 
       - name: TypeScript type checking
         run: |
           cd client
           echo "🔍 Running TypeScript type checking..."
-          pnpm exec tsc --noEmit || {
+          npx tsc --noEmit || {
             echo "❌ TypeScript errors found"
             exit 1
           }
@@ -109,7 +101,7 @@ jobs:
         run: |
           cd client
           echo "🏗️  Building frontend..."
-          pnpm run build
+          npm run build
           echo "✅ Build successful"
         env:
           VITE_API_URL: https://api.example.com # Dummy URL for build
@@ -118,7 +110,7 @@ jobs:
         run: |
           cd client
           # If you have ESLint configured:
-          # pnpm run lint
+          # npm run lint
           echo "⚠️  Linting not configured yet"
         continue-on-error: true
 
@@ -126,7 +118,7 @@ jobs:
         run: |
           cd client
           # If you have tests:
-          # pnpm test
+          # npm test
           echo "⚠️  Tests not configured yet"
         continue-on-error: true
 
@@ -139,18 +131,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          version: 8
+          node-version: '20'
 
       - name: Audit backend dependencies
         run: |
           cd server
           echo "🔒 Auditing backend dependencies..."
-          pnpm audit --prod || {
+          npm audit --production || {
             echo "⚠️  Vulnerabilities found in backend dependencies"
-            echo "Run 'pnpm audit --prod' locally for details"
+            echo "Run 'npm audit --production' locally for details"
           }
         continue-on-error: true
 
@@ -158,9 +150,9 @@ jobs:
         run: |
           cd client
           echo "🔒 Auditing frontend dependencies..."
-          pnpm audit --prod || {
+          npm audit --production || {
             echo "⚠️  Vulnerabilities found in frontend dependencies"
-            echo "Run 'pnpm audit --prod' locally for details"
+            echo "Run 'npm audit --production' locally for details"
           }
         continue-on-error: true
 

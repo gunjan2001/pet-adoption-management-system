@@ -32,26 +32,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
+          cache: 'npm'
+          cache-dependency-path: 'server/package-lock.json'
 
       - name: Install backend dependencies
         run: |
           cd server
-          pnpm install --frozen-lockfile
+          npm ci
 
       - name: Build backend
         run: |
           cd server
-          pnpm run build
+          npm run build
 
       - name: Deploy to Render
         env:
@@ -82,19 +78,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
+          cache: 'npm'
+          cache-dependency-path: 'client/package-lock.json'
 
       - name: Install Vercel CLI
-        run: pnpm add -g vercel@latest
+        run: npm install -g vercel@latest
 
       - name: Pull Vercel Environment
         run: |
