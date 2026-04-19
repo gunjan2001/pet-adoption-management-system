@@ -25,18 +25,29 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'client/package-lock.json'
 
+      - name: Install dependencies
+        run: |
+          cd client
+          npm ci
+
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
 
-      - name: Pull Vercel Environment Information
+      - name: Verify Vercel CLI account and project
         run: |
           cd client
-          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          vercel whoami --token=${{ secrets.VERCEL_TOKEN }}
+          vercel projects ls --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Build Project Artifacts
+      - name: Pull Vercel environment information
         run: |
           cd client
-          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }} --local-config ../vercel.json
+
+      - name: Build project artifacts
+        run: |
+          cd client
+          npm run build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
@@ -44,7 +55,7 @@ jobs:
         id: deploy
         run: |
           cd client
-          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          URL=$(vercel deploy --prod --confirm --token=${{ secrets.VERCEL_TOKEN }} --local-config ../vercel.json)
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "Deployment URL: $URL"
 
