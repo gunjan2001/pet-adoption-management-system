@@ -13,7 +13,6 @@ import { LoginPage } from "./pages/Login";
 import { RegisterPage } from "./pages/Register";
 import Navigation from "./components/Navigation";
 import { useAuth } from "./_core/hooks/useAuth";
-import { TooltipProvider } from "./components/ui/tooltip";
 import { Toaster } from "sonner";
 import NotFound from "./pages/NotFound";
 
@@ -101,7 +100,7 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <ThemeProvider defaultTheme="light">
-          <TooltipProvider>
+          <>
             <Toaster />
             <div className="min-h-screen flex flex-col bg-background text-foreground">
               <Navigation />
@@ -109,7 +108,7 @@ function App() {
                 <Router />
               </main>
             </div>
-          </TooltipProvider>
+          </>
         </ThemeProvider>
       </AuthProvider>
     </ErrorBoundary>

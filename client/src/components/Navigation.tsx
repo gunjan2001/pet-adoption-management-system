@@ -1,4 +1,3 @@
-// src/components/Navigation.tsx
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
