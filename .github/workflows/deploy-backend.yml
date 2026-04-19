@@ -19,31 +19,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
           cd server
-          pnpm install --frozen-lockfile
+          npm ci
 
       - name: Build TypeScript
         run: |
           cd server
-          pnpm run build
+          npm run build
 
       - name: Run tests (if any)
         run: |
           cd server
-          # pnpm test
+          # npm test
         continue-on-error: true
 
       - name: Deploy to Render
@@ -91,4 +86,4 @@ jobs:
         if: failure()
         run: |
           echo "❌ Backend deployment failed!"
-          echo "Please check Render dashboard for logs"
+          echo "Please check Render dashboard for logs
