@@ -17,37 +17,24 @@ This directory contains automated CI/CD workflows for the Pet Adoption Managemen
 
 ---
 
-### 2. `deploy-backend.yml` - Backend Deployment
-**Triggers:** 
-- Push to `main` when files in `server/`, `shared/`, or `drizzle/` change
-- Manual trigger
-
-**What it does:**
-- Installs dependencies
-- Builds TypeScript
-- Deploys to Render
-- Runs health check
-
-**Use case:** Automatic deployment when backend code changes
-
----
-
-### 3. `deploy-frontend.yml` - Frontend Deployment
+### 2. `deploy-fullstack.yml` - Full Stack Deployment
 **Triggers:**
-- Push to `main` when files in `client/` or `shared/` change
-- Manual trigger
+- Push to `main` when files in `client/`, `server/`, or `drizzle/` change
+- Version tags (e.g., `v1.0.0`)
+- Manual trigger with options
 
 **What it does:**
-- Installs dependencies
-- Builds React app
-- Deploys to Vercel
-- Verifies deployment
+- Deploys backend to Render
+- Deploys frontend to Vercel
+- Runs smoke tests
+- Creates GitHub Release (for version tags)
 
-**Use case:** Automatic deployment when frontend code changes
+**Use case:**
+- Major releases
+- Changes affecting both frontend and backend
+- Manual deployment of entire stack
 
 ---
-
-### 4. `deploy-fullstack.yml` - Full Stack Deployment
 **Triggers:**
 - Push to `main` branch
 - Version tags (e.g., `v1.0.0`)
@@ -115,34 +102,6 @@ This directory contains automated CI/CD workflows for the Pet Adoption Managemen
 ---
 
 ## 🎯 Common Use Cases
-
-### Deploy Backend Only
-```bash
-# Automatic: Just push backend changes
-git add server/
-git commit -m "fix: update auth logic"
-git push origin main
-
-# Manual: Via GitHub UI
-Actions → "Deploy Backend to Render" → Run workflow
-
-# Manual: Via CLI
-gh workflow run deploy-backend.yml
-```
-
-### Deploy Frontend Only
-```bash
-# Automatic: Just push frontend changes
-git add client/
-git commit -m "feat: add new filter"
-git push origin main
-
-# Manual: Via GitHub UI
-Actions → "Deploy Frontend to Vercel" → Run workflow
-
-# Manual: Via CLI
-gh workflow run deploy-frontend.yml
-```
 
 ### Deploy Full Stack
 ```bash
@@ -217,7 +176,7 @@ gh run rerun <run-id>
 **Debug:**
 ```bash
 # View workflow configuration
-cat .github/workflows/deploy-backend.yml
+cat .github/workflows/deploy-fullstack.yml
 
 # Validate YAML syntax
 yamllint .github/workflows/
@@ -228,13 +187,13 @@ yamllint .github/workflows/
 **Backend:**
 1. Check Render dashboard logs
 2. Verify environment variables
-3. Test build locally: `cd server && pnpm run build`
+3. Test build locally: `cd server && npm run build`
 4. Check `RENDER_SERVICE_ID` is correct
 
 **Frontend:**
 1. Check Vercel deployment logs
 2. Verify Vercel tokens/IDs
-3. Test build locally: `cd client && pnpm run build`
+3. Test build locally: `cd client && npm run build`
 4. Check `VITE_API_URL` is set
 
 ### Secrets Not Working
