@@ -8,6 +8,13 @@
       "when": 1773989141332,
       "tag": "0000_yummy_sir_ram",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776681272555,
+      "tag": "0001_illegal_kid_colt",
+      "breakpoints": true
     }
   ]
 }

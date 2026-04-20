@@ -14,8 +14,8 @@ import {
 // ── Enums ────────────────────────────────────────────────────────────────────
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const genderEnum = pgEnum("gender", ["male", "female", "unknown"]);
-export const petStatusEnum = pgEnum("status", ["available", "adopted", "pending"]);
-export const adoptionStatusEnum = pgEnum("status", ["pending", "approved", "rejected"]);
+export const petStatusEnum = pgEnum("pet_status", ["available", "adopted", "pending"]);
+export const adoptionStatusEnum = pgEnum("adoption_status", ["pending", "approved", "rejected"]);
 
 // ── Users ────────────────────────────────────────────────────────────────────
 export const users = pgTable("users", {
