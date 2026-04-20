@@ -63,9 +63,9 @@ jobs:
           echo "⏳ Waiting for backend to deploy (60 seconds)..."
           sleep 60
 
-  # Job 2: Deploy Frontend (depends on backend)
+  # Job 2: Deploy Frontend (depends on backend only when backend is requested)
   deploy-frontend:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.deploy_frontend }}
+    if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.deploy_frontend) }}
     needs: deploy-backend
     runs-on: ubuntu-latest
     
@@ -80,18 +80,18 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'client/package-lock.json'
 
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Pull Vercel Environment
+      - name: Install frontend dependencies
         run: |
           cd client
-          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          npm ci
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
 
       - name: Build frontend
         run: |
           cd client
-          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          npm run build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
@@ -99,9 +99,18 @@ jobs:
         id: deploy
         run: |
           cd client
-          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          PROJECT_ARGS=""
+          if [ -n "${VERCEL_PROJECT_ID:-}" ]; then PROJECT_ARGS="--project $VERCEL_PROJECT_ID"; fi
+          SCOPE_ARGS=""
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then SCOPE_ARGS="--scope $VERCEL_ORG_ID"; fi
+          URL=$(vercel deploy --prod --confirm --token="$VERCEL_TOKEN" --local-config ../vercel.json $PROJECT_ARGS $SCOPE_ARGS --env VITE_API_URL="$VITE_API_URL")
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "✅ Frontend deployed to: $URL"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
       - name: Wait for deployment to be ready
         run: sleep 15
