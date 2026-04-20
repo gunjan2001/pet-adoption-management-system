@@ -16,6 +16,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 import { Toaster } from "sonner";
 import NotFound from "./pages/NotFound";
 import Footer from "./components/Footer";
+import ScrollToTop from "./components/ScrollToTop";
 
 // ── Route Guards ──────────────────────────────────────────────────────────────
 
@@ -60,38 +61,41 @@ function ProtectedAdminRoute({ component: Component }: { component: React.Compon
 // ── Router ────────────────────────────────────────────────────────────────────
 function Router() {
   return (
-    <Switch>
-      {/* ── Public ──────────────────────────────────────────────────────── */}
-      <Route path="/"           component={Home} />
-      <Route path="/login"      component={LoginPage} />
-      <Route path="/register"   component={RegisterPage} />
-      <Route path="/pets"       component={PetListing} />
-      <Route path="/pets/:id"   component={PetDetail} />
+    <>
+      <ScrollToTop />
+      <Switch>
+        {/* ── Public ──────────────────────────────────────────────────────── */}
+        <Route path="/"           component={Home} />
+        <Route path="/login"      component={LoginPage} />
+        <Route path="/register"   component={RegisterPage} />
+        <Route path="/pets"       component={PetListing} />
+        <Route path="/pets/:id"   component={PetDetail} />
 
-      {/* ── Authenticated user ────────────────────────────────────────────── */}
-      <Route
-        path="/dashboard"
-        component={() => <ProtectedUserRoute component={UserDashboard} />}
-      />
+        {/* ── Authenticated user ────────────────────────────────────────────── */}
+        <Route
+          path="/dashboard"
+          component={() => <ProtectedUserRoute component={UserDashboard} />}
+        />
 
-      {/* ── Admin ──────────────────────────────────────────────────────────── */}
-      <Route
-        path="/admin"
-        component={() => <ProtectedAdminRoute component={AdminDashboard} />}
-      />
-      <Route
-        path="/admin/pets"
-        component={() => <ProtectedAdminRoute component={AdminManagePets} />}
-      />
-      <Route
-        path="/admin/applications"
-        component={() => <ProtectedAdminRoute component={AdminApplications} />}
-      />
+        {/* ── Admin ──────────────────────────────────────────────────────────── */}
+        <Route
+          path="/admin"
+          component={() => <ProtectedAdminRoute component={AdminDashboard} />}
+        />
+        <Route
+          path="/admin/pets"
+          component={() => <ProtectedAdminRoute component={AdminManagePets} />}
+        />
+        <Route
+          path="/admin/applications"
+          component={() => <ProtectedAdminRoute component={AdminApplications} />}
+        />
 
-      {/* ── Fallback ───────────────────────────────────────────────────────── */}
-      <Route path="/404" component={NotFound} />
-      <Route component={NotFound} />
-    </Switch>
+        {/* ── Fallback ───────────────────────────────────────────────────────── */}
+        <Route path="/404" component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 
