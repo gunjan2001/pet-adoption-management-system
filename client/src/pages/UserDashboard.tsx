@@ -1,4 +1,4 @@
-// src/pages/UserDashboard.tsx
+// src/pages/UserDashboard.tsx (Alternative version with enhanced modal)
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
@@ -8,7 +8,8 @@ import { getErrorMessage } from "@/lib/errorHandler";
 import { format } from "date-fns";
 import { PawPrint, ArrowRight, Clock, CheckCircle2, XCircle, LogOut } from "lucide-react";
 import { toast } from "sonner";
-import type { AdoptionStatus } from "@/types";
+import WithdrawModal from "@/components/WithdrawModal";
+import type { AdoptionStatus, ApplicationWithPet, ApplicationWithPetAndApplicant } from "@/types";
 
 const STATUS_CONFIG: Record<AdoptionStatus, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
   pending:  { bg: "bg-amber-50  border-amber-200",  text: "text-amber-700",  icon: <Clock       className="w-4 h-4 text-amber-500" />,  label: "Pending"  },
@@ -20,7 +21,8 @@ export default function UserDashboard() {
   const { user, isAuthenticated, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { applications, isLoading, refetch } = useMyApplications();
-  const [withdrawing, setWithdrawing] = useState<number | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [applicationToWithdraw, setApplicationToWithdraw] = useState<ApplicationWithPet | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) setLocation("/");
@@ -29,17 +31,29 @@ export default function UserDashboard() {
 
   if (!isAuthenticated) return null;
 
-  const handleWithdraw = async (id: number) => {
-    if (!confirm("Are you sure you want to withdraw this application?")) return;
-    setWithdrawing(id);
+  const handleWithdrawClick = (application: ApplicationWithPet) => {
+    setApplicationToWithdraw(application);
+  };
+
+  const handleWithdrawConfirm = async () => {
+    if (!applicationToWithdraw) return;
+    
+    setWithdrawing(true);
     try {
-      await adoptionsApi.withdraw(id);
-      toast.success("Application withdrawn");
+      await adoptionsApi.withdraw(applicationToWithdraw.application.id);
+      toast.success("Application withdrawn successfully");
+      setApplicationToWithdraw(null);
       refetch();
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
-      setWithdrawing(null);
+      setWithdrawing(false);
+    }
+  };
+
+  const handleWithdrawCancel = () => {
+    if (!withdrawing) {
+      setApplicationToWithdraw(null);
     }
   };
 
@@ -63,17 +77,6 @@ export default function UserDashboard() {
               Welcome back, <span className="font-semibold text-gray-700">{user?.name ?? user?.email}</span>
             </p>
           </div>
-          {/* <div className="flex items-center gap-2 flex-shrink-0">
-            <Link href="/pets">
-              <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold shadow-sm shadow-amber-200 transition-colors cursor-pointer">
-                <PawPrint className="w-4 h-4" /> Browse Pets
-              </span>
-            </Link>
-            <button onClick={logout}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-600 hover:text-red-500 hover:border-red-200 transition-colors">
-              <LogOut className="w-4 h-4" /> Logout
-            </button>
-          </div> */}
         </div>
 
         {/* ── Stat pills ───────────────────────────────────────────────────── */}
@@ -124,7 +127,8 @@ export default function UserDashboard() {
 
         ) : (
           <div className="space-y-4">
-            {applications.map(({ application, pet }) => {
+            {applications.map((item) => {
+              const { application, pet } = item;
               const cfg = STATUS_CONFIG[application.status];
               return (
                 <div key={application.id}
@@ -199,10 +203,11 @@ export default function UserDashboard() {
                         {/* Withdraw */}
                         {application.status === "pending" && (
                           <div className="mt-4 flex justify-end">
-                            <button onClick={() => handleWithdraw(application.id)}
-                              disabled={withdrawing === application.id}
-                              className="px-4 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 disabled:opacity-50 transition-colors">
-                              {withdrawing === application.id ? "Withdrawing…" : "Withdraw Application"}
+                            <button 
+                              onClick={() => handleWithdrawClick(item)}
+                              className="px-4 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 transition-colors"
+                            >
+                              Withdraw Application
                             </button>
                           </div>
                         )}
@@ -215,6 +220,15 @@ export default function UserDashboard() {
           </div>
         )}
       </div>
+
+      {/* ── Withdraw Confirmation Modal ──────────────────────────────────── */}
+      <WithdrawModal
+        isOpen={!!applicationToWithdraw}
+        onClose={handleWithdrawCancel}
+        onConfirm={handleWithdrawConfirm}
+        application={applicationToWithdraw}
+        isLoading={withdrawing}
+      />
     </div>
   );
 }
