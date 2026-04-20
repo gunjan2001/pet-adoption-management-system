@@ -4,18 +4,7 @@ name: Deploy Full Stack
 # Useful for releases that touch both parts of the application
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'v*' # Trigger on version tags like v1.0.0
-    paths:
-      - 'client/**'
-      - 'server/**'
-      - 'drizzle/**'
-      - '.github/workflows/deploy-fullstack.yml'
-      - 'vercel.json'
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch: # Manual trigger only
     inputs:
       deploy_backend:
         description: 'Deploy backend to Render'
