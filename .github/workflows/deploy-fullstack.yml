@@ -9,6 +9,12 @@ on:
       - main
     tags:
       - 'v*' # Trigger on version tags like v1.0.0
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - 'drizzle/**'
+      - '.github/workflows/deploy-fullstack.yml'
+      - 'vercel.json'
   workflow_dispatch: # Allow manual trigger
     inputs:
       deploy_backend:

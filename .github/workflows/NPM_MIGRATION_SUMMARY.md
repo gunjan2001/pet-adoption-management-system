@@ -9,12 +9,10 @@ This package contains everything you need to switch your project from pnpm to np
 ### 1. Migration Guide
 - **SWITCH_TO_NPM_GUIDE.md** - Complete step-by-step guide to migrate from pnpm to npm
 
-### 2. npm-based Workflow Files (5 workflows)
+### 2. npm-based Workflow Files (3 workflows)
 All workflow files configured for npm:
 
 - **workflows-npm/ci.yml** - Continuous integration checks
-- **workflows-npm/deploy-backend.yml** - Backend deployment to Render
-- **workflows-npm/deploy-frontend.yml** - Frontend deployment to Vercel
 - **workflows-npm/deploy-fullstack.yml** - Full stack deployment
 - **workflows-npm/migrate-database.yml** - Database migrations
 
@@ -160,8 +158,6 @@ your-project/
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml (updated for npm)
-│       ├── deploy-backend.yml (updated for npm)
-│       ├── deploy-frontend.yml (updated for npm)
 │       ├── deploy-fullstack.yml (updated for npm)
 │       └── migrate-database.yml (updated for npm)
 ├── client/

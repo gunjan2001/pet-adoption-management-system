@@ -322,7 +322,7 @@ Located: `client/src/contexts/AuthContext.tsx`
 - Auth logic: `server/src/controllers/auth.controller.ts`
 - Auth routes: `server/src/routes/auth.routes.ts`
 - Auth middleware: `server/src/middleware/auth.ts`
-- DB schema: `drizzle/schema.ts`
+- DB schema: `server/src/db/schema.ts`
 - HTTP client: `client/src/lib/api/httpClient.ts`
 - Auth API: `client/src/lib/api/auth.api.ts`
 - Auth Context: `client/src/contexts/AuthContext.tsx`
