@@ -1,4 +1,4 @@
-// src/pages/AdminManagePets.tsx
+// src/pages/AdminManagePets.tsx (Updated with Delete Modal and Multiple Images)
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -7,15 +7,22 @@ import { petsApi } from "@/lib/api/pets.api";
 import { getErrorMessage } from "@/lib/errorHandler";
 import { toast } from "sonner";
 import { Plus, Trash2, Edit2, ArrowLeft, Search, X } from "lucide-react";
+import DeletePetModal from "@/components/DeletePetModal";
+import ImageUploadField from "@/components/ImageUploadField";
 import type { Pet, CreatePetInput, PetStatus, Gender } from "@/types";
 
 // ── Shared input style ────────────────────────────────────────────────────────
 const inp = "w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm transition-all";
 
+// ── Extended form type with images array ──────────────────────────────────────
+interface PetFormInput extends CreatePetInput {
+  images?: string[]; // Array of image URLs or base64 strings
+}
+
 // ── Blank form ────────────────────────────────────────────────────────────────
-const BLANK: CreatePetInput = {
+const BLANK: PetFormInput = {
   name: "", species: "", breed: "", description: "", imageUrl: "",
-  gender: "unknown", status: "available",
+  gender: "unknown", status: "available", images: [],
 };
 
 const STATUS_DOT: Record<PetStatus, string> = {
@@ -43,9 +50,12 @@ export default function AdminManagePets() {
   // ── Form state ────────────────────────────────────────────────────────────
   const [showForm,  setShowForm]  = useState(false);
   const [editing,   setEditing]   = useState<Pet | null>(null);
-  const [form,      setForm]      = useState<CreatePetInput>(BLANK);
+  const [form,      setForm]      = useState<PetFormInput>(BLANK);
   const [saving,    setSaving]    = useState(false);
-  const [deleting,  setDeleting]  = useState<number | null>(null);
+  
+  // ── Delete modal state ────────────────────────────────────────────────────
+  const [petToDelete, setPetToDelete] = useState<Pet | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const openCreate = () => {
     setEditing(null);
@@ -55,6 +65,10 @@ export default function AdminManagePets() {
 
   const openEdit = (pet: Pet) => {
     setEditing(pet);
+    
+    // Handle backward compatibility: if pet has images array, use it; otherwise use imageUrl
+    const images = (pet as any).images || (pet.imageUrl ? [pet.imageUrl] : []);
+    
     setForm({
       name:        pet.name,
       species:     pet.species,
@@ -65,25 +79,45 @@ export default function AdminManagePets() {
       status:      pet.status,
       age:         pet.age         ?? undefined,
       adoptionFee: pet.adoptionFee ? Number(pet.adoptionFee) : undefined,
+      images:      images,
     });
     setShowForm(true);
   };
 
-  const closeForm = () => { setShowForm(false); setEditing(null); };
+  const closeForm = () => { 
+    setShowForm(false); 
+    setEditing(null); 
+    setForm(BLANK);
+  };
 
-  const set = (field: keyof CreatePetInput) =>
+  const set = (field: keyof PetFormInput) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleImagesChange = (images: string[]) => {
+    setForm((f) => ({ 
+      ...f, 
+      images,
+      // Also set first image as imageUrl for backward compatibility
+      imageUrl: images.length > 0 ? images[0] : ""
+    }));
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
+      // Prepare data - include images array
+      const dataToSend = {
+        ...form,
+        images: form.images || [],
+      };
+
       if (editing) {
-        await petsApi.update(editing.id, form);
+        await petsApi.update(editing.id, dataToSend);
         toast.success(`${form.name} updated`);
       } else {
-        await petsApi.create(form);
+        await petsApi.create(dataToSend);
         toast.success(`${form.name} added`);
       }
       closeForm();
@@ -95,17 +129,29 @@ export default function AdminManagePets() {
     }
   };
 
-  const handleDelete = async (pet: Pet) => {
-    if (!confirm(`Delete "${pet.name}"? This cannot be undone.`)) return;
-    setDeleting(pet.id);
+  const handleDeleteClick = (pet: Pet) => {
+    setPetToDelete(pet);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!petToDelete) return;
+    
+    setDeleting(true);
     try {
-      await petsApi.delete(pet.id);
-      toast.success(`${pet.name} deleted`);
+      await petsApi.delete(petToDelete.id);
+      toast.success(`${petToDelete.name} deleted`);
+      setPetToDelete(null);
       refetch();
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
-      setDeleting(null);
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    if (!deleting) {
+      setPetToDelete(null);
     }
   };
 
@@ -181,45 +227,54 @@ export default function AdminManagePets() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filtered.map((pet) => (
-              <div key={pet.id} className="rounded-2xl border border-gray-100 overflow-hidden bg-white hover:shadow-lg transition-shadow flex flex-col">
-                {/* Image */}
-                <div className="relative h-40 bg-gray-50 flex-shrink-0">
-                  {pet.imageUrl
-                    ? <img src={pet.imageUrl} alt={pet.name} className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center text-4xl">🐾</div>}
-                  {/* Status dot */}
-                  <span className={`absolute top-2 right-2 w-3 h-3 rounded-full border-2 border-white ${STATUS_DOT[pet.status]}`} title={pet.status} />
-                </div>
-                {/* Info */}
-                <div className="p-4 flex flex-col flex-1">
-                  <p className="font-bold text-gray-900 truncate">{pet.name}</p>
-                  <p className="text-xs text-gray-600 capitalize mb-1">{pet.species}{pet.breed ? ` · ${pet.breed}` : ""}</p>
-                  <div className="text-xs text-gray-600 space-y-0.5 mb-3">
-                    {pet.age != null && <p>{Math.floor(pet.age / 12)} yr{Math.floor(pet.age / 12) !== 1 ? "s" : ""} {pet.age % 12}m · {pet.gender ?? "—"}</p>}
-                    {pet.adoptionFee && <p>Fee: ${pet.adoptionFee}</p>}
-                    <p className="capitalize font-medium text-gray-900">{pet.status}</p>
+            {filtered.map((pet) => {
+              // Get first image from images array or fallback to imageUrl
+              const displayImage = (pet as any).images?.[0] || pet.imageUrl;
+              
+              return (
+                <div key={pet.id} className="rounded-2xl border border-gray-100 overflow-hidden bg-white hover:shadow-lg transition-shadow flex flex-col">
+                  {/* Image */}
+                  <div className="relative h-40 bg-gray-50 flex-shrink-0">
+                    {displayImage
+                      ? <img src={displayImage} alt={pet.name} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center text-4xl">🐾</div>}
+                    {/* Status dot */}
+                    <span className={`absolute top-2 right-2 w-3 h-3 rounded-full border-2 border-white ${STATUS_DOT[pet.status]}`} title={pet.status} />
+                    {/* Image count badge */}
+                    {(pet as any).images?.length > 1 && (
+                      <span className="absolute top-2 left-2 px-2 py-1 rounded-md bg-black/60 text-white text-xs font-medium">
+                        {(pet as any).images.length} photos
+                      </span>
+                    )}
                   </div>
-                  {/* Actions */}
-                  <div className="flex gap-2 mt-auto">
-                    <button
-                      onClick={() => openEdit(pet)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 hover:border-amber-300 hover:text-amber-600 transition-colors"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" /> Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(pet)}
-                      disabled={deleting === pet.id}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-50 text-red-600 border border-red-200 text-sm hover:bg-red-100 disabled:opacity-50 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      {deleting === pet.id ? "…" : "Delete"}
-                    </button>
+                  {/* Info */}
+                  <div className="p-4 flex flex-col flex-1">
+                    <p className="font-bold text-gray-900 truncate">{pet.name}</p>
+                    <p className="text-xs text-gray-600 capitalize mb-1">{pet.species}{pet.breed ? ` · ${pet.breed}` : ""}</p>
+                    <div className="text-xs text-gray-600 space-y-0.5 mb-3">
+                      {pet.age != null && <p>{Math.floor(pet.age / 12)} yr{Math.floor(pet.age / 12) !== 1 ? "s" : ""} {pet.age % 12}m · {pet.gender ?? "—"}</p>}
+                      {pet.adoptionFee && <p>Fee: ${pet.adoptionFee}</p>}
+                      <p className="capitalize font-medium text-gray-900">{pet.status}</p>
+                    </div>
+                    {/* Actions */}
+                    <div className="flex gap-2 mt-auto">
+                      <button
+                        onClick={() => openEdit(pet)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 hover:border-amber-300 hover:text-amber-600 transition-colors"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" /> Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(pet)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-50 text-red-600 border border-red-200 text-sm hover:bg-red-100 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
@@ -231,7 +286,7 @@ export default function AdminManagePets() {
           <div className="flex-1 bg-black/70 backdrop-blur-sm" onClick={closeForm} />
           {/* Panel */}
           <div className="w-full max-w-lg z-10 bg-white border-l border-gray-200 shadow-2xl overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
               <h2 className="font-bold text-lg text-gray-900">{editing ? `Edit ${editing.name}` : "Add New Pet"}</h2>
               <button onClick={closeForm} className="text-gray-400 hover:text-gray-900 transition-colors">
                 <X className="w-5 h-5" />
@@ -301,6 +356,14 @@ export default function AdminManagePets() {
                 />
               </div>
 
+              {/* Multiple Image Upload */}
+              {/* <ImageUploadField
+                images={form.images || []}
+                onChange={handleImagesChange}
+                maxImages={5}
+                maxSizeMB={5}
+              /> */}
+
               {/* Image URL */}
               <div>
                 <label className="text-xs font-medium text-gray-700 mb-1.5 block">Image URL</label>
@@ -337,6 +400,15 @@ export default function AdminManagePets() {
           </div>
         </div>
       )}
+
+      {/* ── Delete Confirmation Modal ─────────────────────────────────────────── */}
+      <DeletePetModal
+        isOpen={!!petToDelete}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        pet={petToDelete}
+        isLoading={deleting}
+      />
     </div>
   );
 }
