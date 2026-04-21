@@ -6,8 +6,8 @@
   "installCommand": "npm install",
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "source": "/((?!api|assets|.*\\..*).*)",
+      "destination": "/"
     }
   ],
   "headers": [
@@ -33,5 +33,7 @@
       ]
     }
   ],
-  "regions": ["iad1"]
+  "regions": [
+    "iad1"
+  ]
 }

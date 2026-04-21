@@ -51,6 +51,22 @@ export const pets = pgTable("pets", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+// export const petImages = pgTable("pet_images", {
+//   id: serial("id").primaryKey(),
+
+//   petId: integer("petId")
+//     .notNull()
+//     .references(() => pets.id, { onDelete: "cascade" }),
+
+//   imageUrl: text("imageUrl").notNull(),
+
+//   // optional: for ordering images (gallery order)
+//   order: integer("order").default(0),
+
+//   createdAt: timestamp("createdAt").defaultNow().notNull(),
+// });
+
+
 export type Pet = typeof pets.$inferSelect;
 export type InsertPet = typeof pets.$inferInsert;
 
