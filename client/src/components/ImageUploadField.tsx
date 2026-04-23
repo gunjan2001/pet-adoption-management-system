@@ -170,7 +170,7 @@ export default function ImageUploadField({
       {mediaItems.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {mediaItems.map((item, index) => (
-            <div key={item.mediaId} className="relative group">
+            <div key={item.id} className="relative group">
               {/* Image */}
               <div className="aspect-square rounded-xl bg-gray-100 overflow-hidden border border-gray-200">
                 <img
