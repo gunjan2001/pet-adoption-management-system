@@ -51,20 +51,21 @@ export const pets = pgTable("pets", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-// export const petImages = pgTable("pet_images", {
-//   id: serial("id").primaryKey(),
+export const petMedia = pgTable("pet_media", {
+  id: serial("id").primaryKey(),
+  petId: integer("petId")
+    .notNull()
+    .references(() => pets.id, { onDelete: "cascade" }),
+  mediaId: integer("mediaId")
+    .notNull()
+    .references(() => media.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").default(0), // for ordering media items
+});
 
-//   petId: integer("petId")
-//     .notNull()
-//     .references(() => pets.id, { onDelete: "cascade" }),
-
-//   imageUrl: text("imageUrl").notNull(),
-
-//   // optional: for ordering images (gallery order)
-//   order: integer("order").default(0),
-
-//   createdAt: timestamp("createdAt").defaultNow().notNull(),
-// });
+export const media = pgTable("media", {
+  id: serial("id").primaryKey(),
+  checksum: text("checksum").notNull(), // path to the media file
+});
 
 
 export type Pet = typeof pets.$inferSelect;

@@ -1,9 +1,10 @@
 // src/controllers/adoption.controller.ts
+import { and, eq, sql } from "drizzle-orm";
 import { Request, Response } from "express";
-import { eq, and, sql } from "drizzle-orm";
-import type { AuthRequest } from "../types";
 import db from "../config/db.js";
-import { adoptionApplications, pets, users } from "../db/schema.js";
+import { adoptionApplications, media, petMedia, pets, users } from "../db/schema.js";
+import { generateImageUrl } from "../helpers/generateImageUrl.js";
+import type { AuthRequest } from "../types";
 import {
   CreateApplicationInput,
   ReviewApplicationInput,
@@ -106,7 +107,30 @@ export const getMyApplications = async (
       .where(eq(adoptionApplications.userId, userId))
       .orderBy(adoptionApplications.createdAt);
 
-    res.status(200).json({ success: true, data: rows });
+      const petsWithImages = await Promise.all(
+        rows.map(async (pet) => {
+          const petImages = await db
+            .select({
+              id: media.id,
+              checksum: media.checksum,
+              sequence: petMedia.sequence,
+            })
+            .from(petMedia)
+            .innerJoin(media, eq(petMedia.mediaId, media.id))
+            .where(eq(petMedia.petId, pet.pet.id))
+            .orderBy(petMedia.sequence);
+  
+          const imgUrl = generateImageUrl(petImages[0]?.checksum || null);
+          
+          const responseData = {...pet, pet: { ...pet.pet, imageUrl: imgUrl } };
+          return responseData;
+        })
+      );
+
+      console.log("petsWithImages",petsWithImages);
+      
+
+    res.status(200).json({ success: true, data: petsWithImages });
   } catch (error) {
     console.error("Get my applications error:", error);
     res.status(500).json({ success: false, message: "Internal server error" });

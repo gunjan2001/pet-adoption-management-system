@@ -8,6 +8,13 @@
       "when": 1776683046999,
       "tag": "0000_violet_steel_serpent",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776855379674,
+      "tag": "0001_cuddly_loki",
+      "breakpoints": true
     }
   ]
 }

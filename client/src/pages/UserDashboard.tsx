@@ -1,15 +1,15 @@
 // src/pages/UserDashboard.tsx (Alternative version with enhanced modal)
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Link, useLocation } from "wouter";
-import { useEffect, useState } from "react";
+import WithdrawModal from "@/components/WithdrawModal";
 import { useMyApplications } from "@/hooks/useAdoptions";
 import { adoptionsApi } from "@/lib/api/adoptions.api";
 import { getErrorMessage } from "@/lib/errorHandler";
+import type { AdoptionStatus, ApplicationWithPet } from "@/types";
 import { format } from "date-fns";
-import { PawPrint, ArrowRight, Clock, CheckCircle2, XCircle, LogOut } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import WithdrawModal from "@/components/WithdrawModal";
-import type { AdoptionStatus, ApplicationWithPet, ApplicationWithPetAndApplicant } from "@/types";
+import { Link, useLocation } from "wouter";
 
 const STATUS_CONFIG: Record<AdoptionStatus, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
   pending:  { bg: "bg-amber-50  border-amber-200",  text: "text-amber-700",  icon: <Clock       className="w-4 h-4 text-amber-500" />,  label: "Pending"  },

@@ -1,6 +1,5 @@
-// src/components/WithdrawModal.tsx
-import { X } from "lucide-react";
 import type { ApplicationWithPet } from "@/types";
+import { X } from "lucide-react";
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -35,7 +34,7 @@ export default function WithdrawModal({
         <div className="flex items-start justify-between p-6 pb-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-xl flex-shrink-0">
-              ⚠️
+              <img src="/warning.svg" alt="Warning" className="w-6 h-6" />
             </div>
             <h2 className="font-bold text-xl text-gray-900">Withdraw Application</h2>
           </div>
