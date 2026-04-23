@@ -26,6 +26,7 @@ export interface Pet {
   gender:      Gender | null;
   description: string | null;
   imageUrl:    string | null;
+  images:      { id: number; url: string, sequence: number }[];  // Array of image objects
   status:      PetStatus;
   adoptionFee: string | null;       // numeric comes back as string from pg
   createdAt:   string;
@@ -142,4 +143,10 @@ export interface PetFilters {
   breed?:   string;
   minAge?:  number;
   maxAge?:  number;
+}
+
+export interface MediaItem {
+  id: number;
+  url: string;
+  sequence: number;
 }

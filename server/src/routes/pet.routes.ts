@@ -1,21 +1,21 @@
 // src/routes/pet.routes.ts
 import { Router } from "express";
-import { authenticate, authorize } from "../middleware/auth";       // ← no .js
+import {
+  createPet,
+  deletePet,
+  getAllPets,
+  getPetById,
+  updatePet,
+  updatePetStatus,
+} from "../controllers/pet.controller"; // ← no .js
+import { authenticate, authorize } from "../middleware/auth"; // ← no .js
 import { validateBody, validateQuery } from "../middleware/validate"; // ← no .js
 import {
   createPetSchema,
+  paginationSchema,
   updatePetSchema,
   updatePetStatusSchema,
-  paginationSchema,
-} from "../validators/schemas";     // ← no .js
-import {
-  getAllPets,
-  getPetById,
-  createPet,
-  updatePet,
-  updatePetStatus,
-  deletePet,
-} from "../controllers/pet.controller"; // ← no .js
+} from "../validators/schemas"; // ← no .js
 
 const router = Router();
 

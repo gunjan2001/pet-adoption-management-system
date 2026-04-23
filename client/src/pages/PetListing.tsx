@@ -1,9 +1,9 @@
 // src/pages/PetListing.tsx
-import { useState, useMemo } from "react";
-import { Link } from "wouter";
-import { Search, ChevronLeft, ChevronRight, SlidersHorizontal, X } from "lucide-react";
 import { usePets } from "@/hooks/usePets";
 import type { PetStatus } from "@/types";
+import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Link } from "wouter";
 
 const LIMIT = 12;
 

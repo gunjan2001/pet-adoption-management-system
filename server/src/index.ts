@@ -1,12 +1,11 @@
-// src/index.ts
-import "dotenv/config";
-import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
-
-// ── Remove .js extensions — tsx resolves these without them ──────────────────
-import authRoutes     from "./routes/auth.routes";
-import petRoutes      from "./routes/pet.routes";
+import "dotenv/config";
+import express, { NextFunction, Request, Response } from "express";
+import cloudinary from "./config/cloudinary.config";
 import adoptionRoutes from "./routes/adoption.routes";
+import authRoutes from "./routes/auth.routes";
+import petRoutes from "./routes/pet.routes";
+import uploadRoutes from "./routes/upload.route";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 5000);
@@ -38,10 +37,21 @@ app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+app.get("/test-cloudinary", async (req, res) => {
+  try {
+    const result = await cloudinary.api.ping();
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error("Cloudinary error:", error);
+    res.status(500).json({ success: false, error });
+  }
+});
+
 // ── API Routes ────────────────────────────────────────────────────────────────
 app.use("/api/auth",      authRoutes);
 app.use("/api/pets",      petRoutes);
 app.use("/api/adoptions", adoptionRoutes);
+app.use("/api/media", uploadRoutes);
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {

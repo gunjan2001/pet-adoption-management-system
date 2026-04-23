@@ -1,31 +1,28 @@
-import { Route, Switch, Redirect } from "wouter";
-import ErrorBoundary from "./components/ErrorBoundary";
-import { ThemeProvider } from "./contexts/ThemeContext";
-import { AuthProvider } from "./contexts/AuthContext";
-import Home from "./pages/Home";
-import PetListing from "./pages/PetListing";
-import PetDetail from "./pages/PetDetail";
-import UserDashboard from "./pages/UserDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import AdminManagePets from "./pages/AdminManagePets";
-import AdminApplications from "./pages/AdminApplications";
-import { LoginPage } from "./pages/Login";
-import { RegisterPage } from "./pages/Register";
-import Navigation from "./components/Navigation";
-import { useAuth } from "./_core/hooks/useAuth";
-import { Toaster } from "sonner";
-import NotFound from "./pages/NotFound";
-import Footer from "./components/Footer";
-import ScrollToTop from "./components/ScrollToTop";
+import { Toaster } from 'sonner';
+import { Redirect, Route, Switch } from 'wouter';
+import { useAuth } from './_core/hooks/useAuth';
+import ErrorBoundary from './components/ErrorBoundary';
+import Footer from './components/Footer';
+import Navigation from './components/Navigation';
+import ScrollToTop from './components/ScrollToTop';
+import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import AdminApplications from './pages/AdminApplications';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminManagePets from './pages/AdminManagePets';
+import Home from './pages/Home';
+import { LoginPage } from './pages/Login';
+import NotFound from './pages/NotFound';
+import PetDetail from './pages/PetDetail';
+import PetListing from './pages/PetListing';
+import { RegisterPage } from './pages/Register';
+import UserDashboard from './pages/UserDashboard';
 
-// ── Route Guards ──────────────────────────────────────────────────────────────
-
-/**
- * Authenticated users only (role = "user").
- * Admins are redirected away — they have their own section.
- * Shows nothing while auth is still rehydrating to avoid a flash.
- */
-function ProtectedUserRoute({ component: Component }: { component: React.ComponentType }) {
+function ProtectedUserRoute({
+  component: Component,
+}: {
+  component: React.ComponentType;
+}) {
   const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) return null;
@@ -35,7 +32,7 @@ function ProtectedUserRoute({ component: Component }: { component: React.Compone
   }
 
   // Admins belong in /admin, not /dashboard
-  if (user?.role === "admin") {
+  if (user?.role === 'admin') {
     return <Redirect to="/admin" />;
   }
 
@@ -46,12 +43,16 @@ function ProtectedUserRoute({ component: Component }: { component: React.Compone
  * Admin users only.
  * Non-admins are redirected to home.
  */
-function ProtectedAdminRoute({ component: Component }: { component: React.ComponentType }) {
+function ProtectedAdminRoute({
+  component: Component,
+}: {
+  component: React.ComponentType;
+}) {
   const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) return null;
 
-  if (!isAuthenticated || user?.role !== "admin") {
+  if (!isAuthenticated || user?.role !== 'admin') {
     return <Redirect to="/" />;
   }
 
@@ -65,11 +66,11 @@ function Router() {
       <ScrollToTop />
       <Switch>
         {/* ── Public ──────────────────────────────────────────────────────── */}
-        <Route path="/"           component={Home} />
-        <Route path="/login"      component={LoginPage} />
-        <Route path="/register"   component={RegisterPage} />
-        <Route path="/pets"       component={PetListing} />
-        <Route path="/pets/:id"   component={PetDetail} />
+        <Route path="/" component={Home} />
+        <Route path="/login" component={LoginPage} />
+        <Route path="/register" component={RegisterPage} />
+        <Route path="/pets" component={PetListing} />
+        <Route path="/pets/:id" component={PetDetail} />
 
         {/* ── Authenticated user ────────────────────────────────────────────── */}
         <Route
@@ -88,7 +89,9 @@ function Router() {
         />
         <Route
           path="/admin/applications"
-          component={() => <ProtectedAdminRoute component={AdminApplications} />}
+          component={() => (
+            <ProtectedAdminRoute component={AdminApplications} />
+          )}
         />
 
         {/* ── Fallback ───────────────────────────────────────────────────────── */}
@@ -112,7 +115,7 @@ function App() {
               <main className="flex-1">
                 <Router />
               </main>
-              <Footer/>
+              <Footer />
             </div>
           </>
         </ThemeProvider>

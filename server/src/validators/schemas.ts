@@ -41,6 +41,7 @@ export const createPetSchema = z.object({
     .nonnegative("Adoption fee cannot be negative")
     .multipleOf(0.01)
     .optional(),
+  mediaIds: z.array(z.number().int().positive()).optional().default([]),
 });
 
 export const updatePetSchema = createPetSchema.partial();

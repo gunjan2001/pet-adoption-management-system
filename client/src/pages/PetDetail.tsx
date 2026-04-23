@@ -1,13 +1,14 @@
-// src/pages/PetDetail.tsx
-import { useState } from "react";
-import { useRoute, useLocation } from "wouter";
-import { useForm, FieldValues } from "react-hook-form";
-import { toast } from "sonner";
-import { ArrowLeft, MapPin, Home, Heart, CheckCircle2 } from "lucide-react";
+// src/pages/PetDetail.tsx (Updated for Cloudinary Media)
+import { useAuth } from "@/_core/hooks/useAuth";
+import ImageSlider from "@/components/ImageSlider";
 import { usePet } from "@/hooks/usePets";
 import { adoptionsApi } from "@/lib/api/adoptions.api";
 import { getErrorMessage } from "@/lib/errorHandler";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { ArrowLeft, CheckCircle2, Heart, Home, MapPin } from "lucide-react";
+import { useState } from "react";
+import { FieldValues, useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { useLocation, useRoute } from "wouter";
 
 // ── Validation ────────────────────────────────────────────────────────────────
 const validateEmail = (email: string): true | string => {
@@ -102,6 +103,9 @@ export default function PetDetail() {
     adopted:   { bg: "bg-gray-100  text-gray-600",   dot: "bg-gray-400",   label: "Adopted"    },
   }[pet.status];
 
+  // Get images from media array, fallback to imageUrl for backward compatibility
+  const imageUrls = pet?.images ?? [];
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50/60 to-white">
       <div className="container mx-auto px-4 max-w-6xl py-12 md:py-20">
@@ -113,18 +117,16 @@ export default function PetDetail() {
         </button>
 
         <div className="grid md:grid-cols-2 gap-10 lg:gap-16">
-          {/* ── Image ──────────────────────────────────────────────────────── */}
+          {/* ── Image Slider ──────────────────────────────────────────────────────── */}
           <div className="relative">
-            <div className="aspect-square w-full rounded-3xl overflow-hidden bg-amber-50 shadow-xl shadow-amber-100">
-              {pet.imageUrl
-                ? <img src={pet.imageUrl} alt={pet.name} className="w-full h-full object-cover" />
-                : <div className="w-full h-full flex items-center justify-center text-8xl">🐾</div>}
-            </div>
             {/* Status badge floating on image */}
-            <span className={`absolute top-4 left-4 flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold shadow-sm ${statusConfig.bg}`}>
+            <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg bg-white/95 backdrop-blur-sm border border-gray-100">
               <span className={`w-2 h-2 rounded-full ${statusConfig.dot}`} />
-              {statusConfig.label}
-            </span>
+              <span className="text-gray-900">{statusConfig.label}</span>
+            </div>
+
+            {/* Image Slider Component */}
+            <ImageSlider images={imageUrls} alt={pet.name} />
           </div>
 
           {/* ── Info ───────────────────────────────────────────────────────── */}
@@ -201,9 +203,9 @@ export default function PetDetail() {
           </div>
         </div>
 
-        {/* ── Application Form ──────────────────────────────────────────────── */}
-        {showForm && isAvailable && !submitted && (
-          <div className="mt-12 bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* ── Application Form ────────────────────────────────────────────────────── */}
+        {showForm && isAvailable && (
+        <div className="mt-12 bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
             {/* Form header */}
             <div className="bg-amber-500 px-8 py-6">
               <h2 className="text-xl font-black text-white">Adoption Application</h2>

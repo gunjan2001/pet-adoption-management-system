@@ -1,7 +1,7 @@
 // src/hooks/usePets.ts
-import { useCallback, useEffect, useRef, useState } from "react";
 import { petsApi } from "@/lib/api/pets.api";
 import { Pet, PetFilters } from "@/types";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface UsePetsResult {
   pets:       Pet[];
@@ -46,6 +46,7 @@ export const usePets = (filters: PetFilters = {}): UsePetsResult => {
       })
       .catch((err) => {
         if (cancelled) return;
+        console.log("error",err);
         setError(err?.response?.data?.message ?? "Failed to load pets");
       })
       .finally(() => {
