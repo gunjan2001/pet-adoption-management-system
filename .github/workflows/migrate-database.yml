@@ -78,62 +78,30 @@ jobs:
           echo ""
           echo "Migration files:"
           ls -lh ../drizzle/migrations/
-
-      - name: Run migrations
+        
+      - name: Run migrations & verify
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NODE_ENV: production
         run: |
           cd server
           
-          echo "🚀 Running migrations on ${{ inputs.environment }}..."
-          echo "⚠️  DATABASE: ${DATABASE_URL%%@*}@***" # Hide credentials in logs
-          echo ""
-          
-          # Use db:migrate instead of db:push (non-interactive)
+          echo "🚀 Running migrations..."
           npm run db:migrate
           
-          # Check exit code
           if [ $? -eq 0 ]; then
-            echo ""
-            echo "✅ Migrations applied successfully!"
-          else
-            echo ""
-            echo "❌ Migration failed!"
-            exit 1
+            echo "✅ Migrations OK, testing connection..."
+            npm install pg --no-save
+            node -e "
+              const { Pool } = require('pg');
+              const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+              pool.query('SELECT NOW()').then(() => {
+                console.log('✅ Verified');
+                process.exit(0);
+              }).catch(e => { console.error('❌ Failed:', e.message); process.exit(1); });
+            "
           fi
 
-          - name: Verify database connection
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          cd server
-          
-          echo "🔍 Verifying database connection..."
-          
-          # Install pg temporarily for connection test (lightweight)
-          npm install pg@latest --no-save
-          
-          # Generic PostgreSQL connection test
-          node -e "
-            const { Pool } = require('pg');
-            const url = process.env.DATABASE_URL;
-            if (!url) {
-              console.error('❌ DATABASE_URL not set');
-              process.exit(1);
-            }
-            const pool = new Pool({ connectionString: url });
-            pool.query('SELECT NOW() as current_time')
-              .then(result => {
-                console.log('✅ Database connection verified:', result.rows[0].current_time);
-                pool.end();
-                process.exit(0);
-              })
-              .catch(err => {
-                console.error('❌ Database connection failed:', err.message);
-                process.exit(1);
-              });
-          "
       - name: Migration summary
         if: success()
         run: |
