@@ -103,7 +103,7 @@ jobs:
             exit 1
           fi
 
-      - name: Verify database connection
+          - name: Verify database connection
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
@@ -111,19 +111,29 @@ jobs:
           
           echo "🔍 Verifying database connection..."
           
-          # Simple connection test using Node
+          # Install pg temporarily for connection test (lightweight)
+          npm install pg@latest --no-save
+          
+          # Generic PostgreSQL connection test
           node -e "
-            const { neon } = require('@neondatabase/serverless');
-            const sql = neon('$DATABASE_URL');
-            sql\`SELECT NOW()\`.then(() => {
-              console.log('✅ Database connection verified');
-              process.exit(0);
-            }).catch(err => {
-              console.error('❌ Database connection failed:', err.message);
+            const { Pool } = require('pg');
+            const url = process.env.DATABASE_URL;
+            if (!url) {
+              console.error('❌ DATABASE_URL not set');
               process.exit(1);
-            });
+            }
+            const pool = new Pool({ connectionString: url });
+            pool.query('SELECT NOW() as current_time')
+              .then(result => {
+                console.log('✅ Database connection verified:', result.rows[0].current_time);
+                pool.end();
+                process.exit(0);
+              })
+              .catch(err => {
+                console.error('❌ Database connection failed:', err.message);
+                process.exit(1);
+              });
           "
-
       - name: Migration summary
         if: success()
         run: |
