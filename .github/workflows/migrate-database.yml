@@ -48,51 +48,64 @@ jobs:
           cd server
           npm ci
 
-      - name: Show pending migrations
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Check migration files
         run: |
           cd server
-          echo "📋 Checking for pending migrations..."
+          echo "📋 Checking for migration files..."
           
-          # List migration files
-          if [ -d "../drizzle/migrations" ]; then
-            echo "Migration files found:"
-            ls -la ../drizzle/migrations/
-          else
-            echo "⚠️ No migration directory found"
+          if [ ! -d "../drizzle/migrations" ]; then
+            echo "❌ ERROR: No migrations directory found!"
+            echo ""
+            echo "You need to generate migrations locally first:"
+            echo "  1. cd server"
+            echo "  2. npm run db:generate"
+            echo "  3. git add drizzle/migrations/"
+            echo "  4. git commit -m 'Add database migrations'"
+            echo "  5. git push"
+            exit 1
           fi
-
-      - name: Run migrations
+          
+          # Count migration files
+          migration_count=$(find ../drizzle/migrations -name "*.sql" | wc -l)
+          
+          if [ "$migration_count" -eq 0 ]; then
+            echo "⚠️  WARNING: No .sql migration files found!"
+            echo "Migration directory exists but is empty."
+            exit 1
+          fi
+          
+          echo "✅ Found $migration_count migration file(s)"
+          echo ""
+          echo "Migration files:"
+          ls -lh ../drizzle/migrations/
+        
+      - name: Run migrations & verify
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NODE_ENV: production
         run: |
           cd server
           
-          echo "🚀 Running migrations on ${{ inputs.environment }}..."
-          echo "⚠️  DATABASE: ${DATABASE_URL%%@*}@***" # Hide credentials in logs
+          echo "🚀 Running migrations..."
+          npm run db:migrate
           
-          # Run migrations using Drizzle
-          npm run db:push
-          
-          echo "✅ Migrations completed successfully!"
-
-      - name: Verify database schema
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          cd server
-          
-          echo "🔍 Verifying database schema..."
-          
-          # You can add custom verification queries here
-          # For example, check if tables exist
-          
-          echo "✅ Database schema verification complete"
+          if [ $? -eq 0 ]; then
+            echo "✅ Migrations OK, testing connection..."
+            npm install pg --no-save
+            node -e "
+              const { Pool } = require('pg');
+              const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+              pool.query('SELECT NOW()').then(() => {
+                console.log('✅ Verified');
+                process.exit(0);
+              }).catch(e => { console.error('❌ Failed:', e.message); process.exit(1); });
+            "
+          fi
 
       - name: Migration summary
+        if: success()
         run: |
+          echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "✅ MIGRATION SUCCESSFUL"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -100,13 +113,16 @@ jobs:
           echo "🗄️  Environment: ${{ inputs.environment }}"
           echo "⏰ Completed:    $(date)"
           echo "👤 Triggered by: ${{ github.actor }}"
+          echo "📝 Commit:       ${{ github.sha }}"
           echo ""
-          echo "Please verify the changes in your application"
+          echo "✅ Database schema is now up to date"
+          echo "Please verify your application is working correctly"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Failure notification
         if: failure()
         run: |
+          echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "❌ MIGRATION FAILED!"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -114,11 +130,18 @@ jobs:
           echo "🗄️  Environment: ${{ inputs.environment }}"
           echo "⏰ Failed at:    $(date)"
           echo "👤 Triggered by: ${{ github.actor }}"
+          echo "📝 Commit:       ${{ github.sha }}"
           echo ""
-          echo "⚠️  IMPORTANT:"
-          echo "1. Check the logs above for error details"
-          echo "2. Verify database state manually"
-          echo "3. You may need to rollback changes"
-          echo "4. Contact database administrator if needed"
+          echo "⚠️  TROUBLESHOOTING STEPS:"
+          echo "1. Check the error logs above"
+          echo "2. Verify DATABASE_URL secret is correct"
+          echo "3. Ensure migration files exist in drizzle/migrations/"
+          echo "4. Test migrations locally first:"
+          echo "   cd server && npm run db:migrate"
+          echo "5. Check database connection and permissions"
+          echo ""
+          echo "🔄 ROLLBACK (if needed):"
+          echo "You may need to manually rollback changes in your database"
+          echo "Contact database administrator if needed"
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
