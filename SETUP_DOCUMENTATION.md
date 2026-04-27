@@ -13,6 +13,9 @@ pet-adoption-management-system/
 ├── client/                 # React Vite frontend app
 │   ├── src/
 │   │   ├── components/     # React UI components
+│   │   │   ├── ImageUploadField.tsx     # Image upload with Cloudinary
+│   │   │   ├── ImageSlider.tsx          # Image carousel component
+│   │   │   └── ...
 │   │   ├── contexts/       # AuthContext, ThemeContext
 │   │   ├── hooks/          # Custom React hooks
 │   │   ├── lib/api/        # HTTP client & API functions
@@ -24,10 +27,15 @@ pet-adoption-management-system/
 ├── server/                 # Express.js backend API
 │   ├── src/
 │   │   ├── controllers/    # Route handler logic
+│   │   │   ├── media.controller.ts      # Image upload handler
+│   │   │   └── ...
 │   │   ├── routes/         # API route definitions
+│   │   │   ├── upload.route.ts          # Media upload routes
+│   │   │   └── ...
 │   │   ├── middleware/     # Authentication, validation
 │   │   ├── validators/     # Zod schemas
-│   │   ├── config/         # Database config
+│   │   ├── config/         # Database & Cloudinary config
+│   │   │   └── cloudinary.config.ts     # Cloudinary setup
 │   │   ├── db/             # Drizzle schema
 │   │   ├── types/          # TypeScript interfaces
 │   │   └── index.ts        # Express app entry point
@@ -35,9 +43,10 @@ pet-adoption-management-system/
 │   ├── package.json
 │   └── tsconfig.json
 ├── drizzle/                # Database migrations & schema
-│   ├── schema.ts           # Database schema definition
-│   └── migrations/         # SQL migration files
-├── shared/                 # Shared types & utilities
+│   ├── migrations/         # SQL migration files
+│   │   ├── 0000_violet_steel_serpent.sql    # Initial schema
+│   │   └── 0001_cuddly_loki.sql             # Media tables
+│   └── meta/               # Migration metadata
 └── package.json            # Root monorepo config
 ```
 
@@ -47,6 +56,8 @@ pet-adoption-management-system/
 - **Zod** - Schema validation
 - **JWT** - Authentication tokens
 - **bcryptjs** - Password hashing
+- **Cloudinary** - Image storage & CDN
+- **Multer** - File upload middleware
 - **CORS** - Cross-origin requests
 - **Axios** - HTTP client (frontend)
 - **React Context** - State management (frontend)
@@ -170,7 +181,19 @@ JWT_EXPIRES_IN=7d
 PORT=5000
 NODE_ENV=development
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+
+# Cloudinary Configuration (for image uploads)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+CLOUDINARY_ENDPOINT=https://res.cloudinary.com/your_cloud_name/image/upload/media
 ```
+
+**Cloudinary Setup:**
+1. Create free account at https://cloudinary.com
+2. Get your Cloud Name, API Key, and API Secret from the dashboard
+3. Update the `.env` file with your credentials
+4. The `CLOUDINARY_ENDPOINT` should be: `https://res.cloudinary.com/{YOUR_CLOUD_NAME}/image/upload/media`
 
 ### 3. Database Setup
 ```bash
@@ -282,6 +305,26 @@ PORT=5001 npm run dev:server
 ### Issue: CORS errors
 **Solution**: Update ALLOWED_ORIGINS in `.env` or CORS configuration in `server/src/index.ts`
 
+### Issue: Image upload fails with "Cloudinary error"
+**Solution**:
+- Verify CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET are set in .env
+- Check that API credentials are correct in Cloudinary dashboard
+- Ensure file size is under 5MB
+- Verify file is a valid image format (JPG, PNG, WebP, etc.)
+- Check server console for detailed Cloudinary error message
+
+### Issue: Images not showing in pet detail page
+**Solution**:
+- Verify CLOUDINARY_ENDPOINT is set correctly: `https://res.cloudinary.com/{YOUR_CLOUD_NAME}/image/upload/media`
+- Check that media records exist in database with checksums
+- Verify pet_media junction table has entries linking pets to media
+- Test upload via: `curl -X POST http://localhost:5000/api/media/upload -F "file=@image.jpg"`
+
+### Issue: Upload endpoint returns 401 Unauthorized
+**Solution**:
+- Include valid JWT token in Authorization header: `Authorization: Bearer {TOKEN}`
+- For unauthenticated uploads, modify endpoint to allow public access (not recommended for production)
+
 ## Validation Rules
 ### Register
 - name: 2-100 chars
@@ -303,6 +346,11 @@ PORT=5001 npm run dev:server
 - reason: 20-2000 chars (why adopting)
 - others: optional
 
+### Image Upload
+- File type: image/* only (JPG, PNG, WebP, GIF, etc.)
+- Max file size: 5MB
+- Required header: Authorization with valid JWT token
+
 ## Client Authentication Context
 Located: `client/src/contexts/AuthContext.tsx`
 - Manages user login state
@@ -316,6 +364,9 @@ Located: `client/src/contexts/AuthContext.tsx`
 3. Enable network tab in browser DevTools to inspect API requests
 4. Use `console.error()` logs already added to API functions
 5. Database errors will appear in server console during operations
+6. **Image uploads**: Test Cloudinary connection with: `curl http://localhost:5000/test-cloudinary`
+7. **Image uploads**: Check file checksums in database: `SELECT * FROM media;`
+8. **Image uploads**: Verify pet-media relationships: `SELECT * FROM pet_media;`
 
 ## Important Files to Remember
 - Entry point: `server/src/index.ts`
@@ -323,9 +374,14 @@ Located: `client/src/contexts/AuthContext.tsx`
 - Auth routes: `server/src/routes/auth.routes.ts`
 - Auth middleware: `server/src/middleware/auth.ts`
 - DB schema: `server/src/db/schema.ts`
+- **Media upload**: `server/src/controllers/media.controller.ts`
+- **Media upload**: `server/src/routes/upload.route.ts`
+- **Media config**: `server/src/config/cloudinary.config.ts`
 - HTTP client: `client/src/lib/api/httpClient.ts`
 - Auth API: `client/src/lib/api/auth.api.ts`
 - Auth Context: `client/src/contexts/AuthContext.tsx`
+- **Image upload component**: `client/src/components/ImageUploadField.tsx`
+- **Image display component**: `client/src/components/ImageSlider.tsx`
 
 ## Testing Register Flow
 ```bash
@@ -338,6 +394,50 @@ curl -X POST http://localhost:5000/api/auth/register \
     "password": "Password123",
     "phone": "1234567890",
     "address": "123 Main St"
+  }'
+```
+
+## Testing Image Upload Flow
+```bash
+# 1. First get a JWT token by logging in
+TOKEN=$(curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "Password123"
+  }' | jq -r '.data.token')
+
+# 2. Test Cloudinary connection
+curl http://localhost:5000/test-cloudinary
+
+# 3. Upload an image (requires valid JWT token)
+curl -X POST http://localhost:5000/api/media/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/to/image.jpg"
+
+# Expected response:
+# {
+#   "message": "File uploaded successfully",
+#   "data": {
+#     "url": "https://res.cloudinary.com/.../image.jpg",
+#     "mediaId": 1
+#   }
+# }
+
+# 4. Create a pet with the uploaded image
+curl -X POST http://localhost:5000/api/pets \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Fluffy",
+    "species": "dog",
+    "breed": "Golden Retriever",
+    "age": 24,
+    "gender": "female",
+    "description": "A friendly and energetic dog",
+    "status": "available",
+    "adoptionFee": 200,
+    "mediaIds": [1]
   }'
 ```
 
