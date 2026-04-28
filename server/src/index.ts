@@ -1,7 +1,6 @@
 import cors from "cors";
 import "dotenv/config";
 import express, { NextFunction, Request, Response } from "express";
-import cloudinary from "./config/cloudinary.config";
 import adoptionRoutes from "./routes/adoption.routes";
 import authRoutes from "./routes/auth.routes";
 import petRoutes from "./routes/pet.routes";
@@ -37,16 +36,6 @@ app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.get("/test-cloudinary", async (req, res) => {
-  try {
-    const result = await cloudinary.api.ping();
-    res.json({ success: true, result });
-  } catch (error) {
-    console.error("Cloudinary error:", error);
-    res.status(500).json({ success: false, error });
-  }
-});
-
 // ── API Routes ────────────────────────────────────────────────────────────────
 app.use("/api/auth",      authRoutes);
 app.use("/api/pets",      petRoutes);
@@ -78,6 +67,8 @@ app.use(
     });
   }
 );
+
+app.set("etag", false);
 
 // ── Start — with graceful EADDRINUSE handling ─────────────────────────────────
 const server = app.listen(PORT, () => {

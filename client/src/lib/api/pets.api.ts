@@ -1,11 +1,11 @@
 // src/lib/api/pets.api.ts
 import type {
-  Pet,
+  ApiSuccess,
   CreatePetInput,
+  PaginationMeta,
+  Pet,
   PetFilters,
   PetStatus,
-  ApiSuccess,
-  PaginationMeta,
 } from "@/types";
 import api from "./httpClient";
 
@@ -16,10 +16,10 @@ export interface PetsListResponse {
 
 export const petsApi = {
   /** Get paginated/filtered list of pets (public) */
-  getAll: async (filters: PetFilters = {}): Promise<PetsListResponse> => {
+  getAll: async (filters: PetFilters = {}, signal?: AbortSignal): Promise<PetsListResponse> => {
     const res = await api.get<ApiSuccess<Pet[]> & { pagination: PaginationMeta }>(
       "/pets",
-      { params: filters }
+      { params: filters, signal }
     );
     return { data: res.data.data ?? [], pagination: res.data.pagination! };
   },

@@ -59,6 +59,8 @@ A full-stack pet adoption platform that connects pets with their forever homes. 
 - **Authentication:** JWT (JSON Web Tokens)
 - **Validation:** Zod schemas
 - **Password Hashing:** bcryptjs
+- **File Upload:** Multer (in-memory)
+- **Image Storage:** Cloudinary
 - **Development:** tsx (TypeScript execution)
 - **CORS:** Cross-origin resource sharing
 
@@ -81,92 +83,113 @@ pet-adoption-management-system/
 │   │   │   ├── Navigation.tsx                 # Main + Admin nav with mobile support
 │   │   │   ├── LoginForm.tsx                  # Login form component
 │   │   │   ├── RegisterForm.tsx               # Registration form component
+│   │   │   ├── ImageUploadField.tsx           # Image upload component with Cloudinary
+│   │   │   ├── ImageSlider.tsx                # Multi-image carousel for pets
 │   │   │   ├── AIChatBox.tsx                  # AI chat component
 │   │   │   ├── ErrorBoundary.tsx              # Error boundary component
-│   │   │   └── ui/                            # Reusable UI components
+│   │   │   ├── DeletePetModal.tsx             # Pet deletion confirmation modal
+│   │   │   ├── WithdrawModal.tsx              # Application withdrawal confirmation
+│   │   │   ├── Footer.tsx                     # Footer component
+│   │   │   └── ScrollToTop.tsx                # Scroll-to-top utility
 │   │   ├── contexts/
 │   │   │   ├── AuthContext.tsx                # Authentication context & provider
-│   │   │   └── ThemeContext.tsx               # Theme context (future use)
+│   │   │   └── ThemeContext.tsx               # Theme context (dark/light mode)
 │   │   ├── hooks/
 │   │   │   ├── usePets.ts                     # Pet data fetching with server-side filters
 │   │   │   ├── useAdoptions.ts                # Adoption application hooks
-│   │   │   ├── useMobile.tsx                  # Mobile detection hook
-│   │   │   └── useComposition.ts              # Composition utilities
+│   │   │   └── useMobile.tsx                  # Mobile detection hook
+│   │   ├── _core/
+│   │   │   └── hooks/
+│   │   │       └── useAuth.ts                 # Core authentication hook
 │   │   ├── lib/
 │   │   │   ├── httpClient.ts                  # Axios instance with JWT interceptor
-│   │   │   ├── api/
-│   │   │   │   ├── auth.api.ts                # Auth service layer
-│   │   │   │   ├── pets.api.ts                # Pet CRUD operations
-│   │   │   │   └── adoptions.api.ts           # Adoption API calls
-│   │   │   ├── utils.ts                       # cn() helper for Tailwind
-│   │   │   └── errorHandler.ts                # Error message extraction
+│   │   │   ├── errorHandler.ts                # Error message extraction utility
+│   │   │   ├── utils.ts                       # cn() helper for Tailwind merging
+│   │   │   └── api/
+│   │   │       ├── auth.api.ts                # Auth service layer
+│   │   │       ├── pets.api.ts                # Pet CRUD operations
+│   │   │       └── adoptions.api.ts           # Adoption API calls
 │   │   ├── pages/
-│   │   │   ├── Home.tsx                       # Landing page (6 sections)
+│   │   │   ├── Home.tsx                       # Landing page (hero + features)
 │   │   │   ├── PetListing.tsx                 # Browse pets with advanced filters
-│   │   │   ├── PetDetail.tsx                  # Pet details + application form
-│   │   │   ├── UserDashboard.tsx              # User's applications
-│   │   │   ├── AdminDashboard.tsx             # Admin overview with stats
+│   │   │   ├── PetDetail.tsx                  # Pet details + adoption application form
+│   │   │   ├── UserDashboard.tsx              # User's adoption applications
+│   │   │   ├── AdminDashboard.tsx             # Admin overview with statistics
 │   │   │   ├── AdminManagePets.tsx            # Pet CRUD with slide-in panel
-│   │   │   ├── AdminApplications.tsx          # Review applications
-│   │   │   ├── ComponentShowcase.tsx          # UI component showcase
-│   │   │   ├── Login.tsx                      # Login page
-│   │   │   ├── Register.tsx                   # Registration page
+│   │   │   ├── AdminApplications.tsx          # Review & approve/reject applications
+│   │   │   ├── Login.tsx                      # User login page
+│   │   │   ├── Register.tsx                   # User registration page
 │   │   │   └── NotFound.tsx                   # 404 page
 │   │   ├── types/
-│   │   │   └── index.ts                       # TypeScript interfaces
-│   │   ├── _core/
-│   │   │   ├── hooks/                         # Core hooks
-│   │   │   └── errors.ts                      # Error definitions
-│   │   ├── const.ts                           # Constants
-│   │   ├── main.tsx                           # App entry point
-│   │   └── App.tsx                            # Root component with routing
-│   ├── vite.config.ts                         # Vite config with proxy
-│   ├── tsconfig.json
-│   ├── tsconfig.node.json
+│   │   │   └── index.ts                       # All TypeScript interfaces (Pet, User, MediaItem, etc.)
+│   │   ├── const.ts                           # Frontend constants (roles, statuses, API URL)
+│   │   ├── index.css                          # Global Tailwind CSS imports
+│   │   ├── main.tsx                           # React app entry point
+│   │   └── App.tsx                            # Root component with Wouter routing
+│   ├── index.html                             # HTML entry point
+│   ├── vite.config.ts                         # Vite build config with React plugin
+│   ├── tsconfig.json                          # Frontend TypeScript config
+│   ├── tsconfig.node.json                     # Vite-specific TypeScript config
+│   ├── components.json                        # Component library config
+│   ├── vercel.json                            # Vercel deployment config
 │   └── package.json
 ├── server/                                    # Express REST backend
 │   ├── src/
 │   │   ├── controllers/
-│   │   │   ├── auth.controller.ts             # Auth endpoints
-│   │   │   ├── pet.controller.ts              # Pet CRUD endpoints
-│   │   │   ├── adoption.controller.ts         # Adoption endpoints
-│   │   │   └── index.ts                       # Express app setup
+│   │   │   ├── auth.controller.ts             # Register, login, profile management
+│   │   │   ├── pet.controller.ts              # Pet CRUD with image handling
+│   │   │   ├── adoption.controller.ts         # Application submission & review
+│   │   │   └── media.controller.ts            # Image upload to Cloudinary
 │   │   ├── routes/
-│   │   │   ├── auth.routes.ts
-│   │   │   ├── pet.routes.ts
-│   │   │   └── adoption.routes.ts
+│   │   │   ├── auth.routes.ts                 # /api/auth/* endpoints
+│   │   │   ├── pet.routes.ts                  # /api/pets/* endpoints
+│   │   │   ├── adoption.routes.ts             # /api/adoptions/* endpoints
+│   │   │   └── upload.route.ts                # /api/media/upload endpoint
 │   │   ├── middleware/
-│   │   │   ├── auth.ts                        # authenticate + authorize
-│   │   │   └── validate.ts                    # Zod validation middleware
+│   │   │   ├── auth.ts                        # JWT authentication & authorization
+│   │   │   └── validate.ts                    # Zod schema validation middleware
 │   │   ├── validators/
-│   │   │   └── schemas.ts                     # All Zod schemas
+│   │   │   └── schemas.ts                     # Zod schemas for all request bodies
 │   │   ├── config/
-│   │   │   └── db.ts                          # Drizzle + pg.Pool setup
+│   │   │   ├── db.ts                          # Drizzle ORM + PostgreSQL pool setup
+│   │   │   └── cloudinary.config.ts           # Cloudinary API configuration
 │   │   ├── db/
-│   │   │   └── schema.ts                      # Database schema (users, pets, applications)
+│   │   │   └── schema.ts                      # Drizzle ORM table definitions
 │   │   ├── types/
-│   │   │   └── index.ts                       # AuthRequest, JwtPayload, etc.
-│   │   └── index.ts                           # Express app entry
-│   ├── seed-pets.js                           # Sample data seeder
-│   ├── migrate.js                             # Migration runner
-│   ├── API_REFERENCE.md                        # API documentation
-│   ├── package.json
-│   └── tsconfig.json
+│   │   │   └── index.ts                       # TypeScript types (AuthRequest, JwtPayload)
+│   │   ├── helpers/
+│   │   │   └── generateImageUrl.ts            # Image URL generation utility
+│   │   ├── index.ts                           # Express app setup & server start
+│   │   ├── config/
+│   │   │   ├── db.ts                          # Database connection setup
+│   │   │   └── cloudinary.config.ts           # Cloudinary API initialization
+│   ├── migrate.js                             # Database migration runner
+│   ├── seed-pets.js                           # Sample pet data seeder
+│   ├── drizzle.config.ts                      # Drizzle Kit configuration
+│   ├── tsconfig.json                          # Backend TypeScript config
+│   ├── API_REFERENCE.md                       # API documentation
+│   └── package.json
 ├── drizzle/
-│   ├── schema.ts                               # Database schema definition
-│   └── migrations/                             # Generated SQL migrations
-├── shared/
-│   ├── const.ts                                # Shared constants
-│   └── types.ts                                # Shared type definitions
-├── drizzle.config.ts                          # Drizzle Kit configuration
-├── REFACTORING_PLAN.md                        # Frontend refactoring documentation
-├── SETUP_DOCUMENTATION.md                     # Setup and troubleshooting guide
-├── README.md                                  # Project README
-├── .gitignore
-├── .prettierrc
-├── .prettierignore
-├── pnpm-lock.yaml
-└── tsconfig.json                              # Root TypeScript config
+│   ├── migrations/                            # Generated SQL migration files
+│   │   ├── 0000_violet_steel_serpent.sql      # Initial schema (users, pets, applications)
+│   │   ├── 0001_cuddly_loki.sql               # Media & pet_media tables
+│   │   └── meta/
+│   │       ├── _journal.json                  # Migration journal
+│   │       ├── 0000_snapshot.json             # Schema snapshot v0
+│   │       └── 0001_snapshot.json             # Schema snapshot v1
+│   └── migrations/                            # Generated migrations folder
+├── .github/                                   # GitHub workflows & configs
+├── .gitignore                                 # Git ignore rules
+├── .prettierrc                                # Prettier formatting config
+├── .prettierignore                            # Prettier ignore patterns
+├── tsconfig.json                              # Root TypeScript configuration
+├── render.yaml                                # Render deployment config
+├── REFACTORING_PLAN.md                        # Previous refactoring documentation
+├── SETUP_DOCUMENTATION.md                     # Setup & troubleshooting guide
+├── SPA_ROUTING_FIX.md                         # SPA routing documentation
+├── PROJECT_DOCUMENTATION.md                   # This file
+├── README.md                                  # Project overview & getting started
+└── package.json                               # Root package.json (if exists)
 ```
 
 ---
@@ -423,10 +446,13 @@ className="bg-gray-100 text-gray-600"
 ✅ **Manage Pets**
 - Full CRUD operations (Create, Read, Update, Delete)
 - Slide-in panel for add/edit forms (no modal)
-- Image URL preview
+- **Multiple image upload** with Cloudinary integration
+- Image carousel/slider on pet detail pages
+- Image URL field + direct file upload support
 - Search pets by name/species
 - Delete with confirmation dialog
 - Status management (Available/Pending/Adopted)
+- Drag-and-drop image ordering (sequence management)
 
 ✅ **Review Applications**
 - View all applications with filters (All/Pending/Approved/Rejected)
@@ -462,6 +488,18 @@ className="bg-gray-100 text-gray-600"
 - Collapsible mobile menus
 - Responsive grids (1→2→3→4 columns)
 - Mobile filters toggle
+
+✅ **Image Management**
+- Cloud-based storage via Cloudinary
+- Multiple images per pet with sequence ordering
+- SHA-256 checksum deduplication
+- Image carousel on pet detail pages
+- Direct file upload in admin pet forms
+- 5MB max file size per image
+- Support for JPG, PNG, WebP, and other image formats
+
+⚠️ **Placeholder/Stub Components** (Not Implemented Yet)
+- `AIChatBox.tsx` - Commented out, prepared for future AI features
 
 ---
 
@@ -570,7 +608,25 @@ Get single pet by ID. **Public.**
 ```typescript
 Response: {
   success: true;
-  data: Pet;
+  data: {
+    id: number;
+    name: string;
+    species: string;
+    breed?: string;
+    age?: number;     // in months
+    gender?: "male" | "female" | "unknown";
+    description?: string;
+    imageUrl?: string;     // primary/featured image (legacy)
+    images: Array<{       // NEW: multiple images support
+      id: number;
+      url: string;       // Cloudinary secure URL
+      sequence: number;  // ordering for carousel
+    }>;
+    status: "available" | "pending" | "adopted";
+    adoptionFee?: number;
+    createdAt: string;
+    updatedAt: string;
+  };
 }
 ```
 
@@ -584,9 +640,10 @@ Body: {
   age?: number;       // in months
   gender?: "male" | "female" | "unknown";
   description?: string;
-  imageUrl?: string;
+  imageUrl?: string;  // legacy: featured image
   status?: "available" | "pending" | "adopted";
   adoptionFee?: number;
+  mediaIds?: number[]; // NEW: array of media IDs from uploads
 }
 Response: {
   success: true;
@@ -703,6 +760,27 @@ Response: {
 }
 ```
 
+### Media Endpoints
+
+#### POST `/api/media/upload`
+Upload image to Cloudinary. **Auth required.**
+```typescript
+Headers: { "Content-Type": "multipart/form-data" }
+Body: FormData with "file" field
+Response: {
+  message: "File uploaded successfully";
+  data: {
+    url: string;      // Cloudinary secure URL
+    mediaId: number;  // ID for linking to pets
+  };
+}
+```
+
+**Constraints:**
+- File size: max 5MB
+- File type: image/* only
+- Form field name: "file"
+
 ---
 
 ## Database Schema
@@ -734,11 +812,29 @@ CREATE TABLE pets (
   age INTEGER,  -- in months
   gender gender DEFAULT 'unknown',  -- 'male' | 'female' | 'unknown'
   description TEXT,
-  imageUrl VARCHAR(500),
-  pet_status pet_status DEFAULT 'available' NOT NULL,  -- 'available' | 'pending' | 'adopted'
+  imageUrl VARCHAR(500),  -- primary/featured image
+  status pet_status DEFAULT 'available' NOT NULL,  -- 'available' | 'pending' | 'adopted'
   adoptionFee NUMERIC(10, 2),
   createdAt TIMESTAMP DEFAULT NOW() NOT NULL,
   updatedAt TIMESTAMP DEFAULT NOW() NOT NULL
+);
+```
+
+### Media Table
+```sql
+CREATE TABLE media (
+  id SERIAL PRIMARY KEY,
+  checksum TEXT NOT NULL  -- SHA-256 hash of the file (Cloudinary public_id)
+);
+```
+
+### Pet Media Junction Table
+```sql
+CREATE TABLE pet_media (
+  id SERIAL PRIMARY KEY,
+  petId INTEGER NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+  mediaId INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+  sequence INTEGER DEFAULT 0  -- ordering for image galleries
 );
 ```
 
@@ -791,6 +887,12 @@ JWT_EXPIRES_IN=7d
 PORT=5000
 NODE_ENV=development
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+
+# Cloudinary Configuration (for image uploads)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+CLOUDINARY_ENDPOINT=https://res.cloudinary.com/your_cloud_name/image/upload/media
 ```
 
 **Client (.env in `/client`):**
@@ -798,6 +900,13 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 # Leave commented to use Vite proxy
 # VITE_API_URL=http://localhost:5000/api
 ```
+
+**Cloudinary Setup:**
+1. Create account at https://cloudinary.com
+2. Get credentials from dashboard (Cloud Name, API Key, API Secret)
+3. Set `CLOUDINARY_ENDPOINT` to: `https://res.cloudinary.com/{YOUR_CLOUD_NAME}/image/upload/media`
+4. Store all credentials in server .env file
+5. Credentials are used in `server/src/config/cloudinary.config.ts`
 
 ### Installation Steps
 
@@ -1138,9 +1247,32 @@ try {
 
 ### File Upload Strategy
 
-**Current:** Image URLs only (user provides URL string)
-**Reason:** Simplicity, no file storage setup needed
-**Future:** Could integrate Cloudinary/S3 for actual file uploads
+**Images are managed through:**
+1. **Cloudinary** - Cloud storage and CDN for image files
+2. **Media Table** - Stores checksums (SHA-256 hashes) as unique identifiers
+3. **Pet-Media Junction Table** - Links pets to their images with sequence ordering
+
+**Upload Flow:**
+1. User selects image(s) in `ImageUploadField` component
+2. File is validated (type, size) on frontend
+3. FormData sent to `POST /api/media/upload`
+4. Backend generates SHA-256 checksum of file
+5. File uploaded to Cloudinary with checksum as public_id
+6. Media record created in database with checksum
+7. mediaId returned to frontend for linking to pets
+
+**Image Display:**
+- `ImageSlider` component displays carousel of pet images
+- Images fetched as array on pet retrieval via JOIN with pet_media
+- Supports single image (legacy `imageUrl`) or multiple images
+- Fallback to paw emoji if no images available
+
+**Benefits:**
+- No local file storage needed
+- CDN delivery for fast load times
+- Deduplication via checksums (same file reused)
+- Multiple images per pet support
+- Cloudinary transforms (resize, crop, etc.) possible
 
 ### CORS Configuration
 
@@ -1153,11 +1285,79 @@ app.use(cors({
 
 Development proxy (Vite) handles `/api` forwarding, so frontend makes same-origin requests.
 
+### Image Upload & Storage Implementation
+
+**Database Design:**
+- `media` table: stores file checksums (SHA-256 hash) as unique identifier
+- `pet_media` junction table: links pets to media with sequence ordering
+- Allows multiple images per pet with custom ordering
+
+**Upload Process:**
+1. User selects image(s) in `ImageUploadField`
+2. Validation on frontend: file type, size (max 5MB)
+3. File sent to `POST /api/media/upload` as FormData
+4. Multer parses file into memory buffer
+5. SHA-256 checksum generated from buffer
+6. Buffer uploaded to Cloudinary with checksum as public_id
+7. Media record inserted with checksum
+8. Client receives mediaId for linking to pets
+
+**Deduplication:**
+- Same file uploaded twice = same checksum
+- Cloudinary skips re-upload (overwrite: false)
+- Client detects duplicate mediaId
+- Only one database record per unique file
+
+**Retrieval:**
+- `getPetById` and `getAllPets` join pets → pet_media → media
+- Images array returned with `url` (from `generateImageUrl`), `id`, and `sequence`
+- `generateImageUrl` transforms checksum → Cloudinary secure_url
+- Images sorted by sequence for carousel order
+
+**Error Handling:**
+- File type validation (image/* only)
+- File size validation (5MB limit)
+- Cloudinary upload errors caught and reported
+- Database errors logged with detailed messaging
+
 ---
 
 ## Migration History
 
-### tRPC → REST API Migration
+### Image Management System Implementation (v1.2.0)
+
+**What Changed:**
+1. **Database Schema**
+   - Added `media` table to store file checksums
+   - Added `pet_media` junction table for pet-image relationships
+   - Migration: `0001_cuddly_loki.sql`
+
+2. **Frontend**
+   - New `ImageUploadField` component for file uploads
+   - New `ImageSlider` component for image carousels
+   - Pet type updated with `images` array field
+   - `MediaItem` type introduced: `{ id, url, sequence }`
+
+3. **Backend**
+   - New `media.controller.ts` with upload handler
+   - New `upload.route.ts` with `/api/media/upload` endpoint
+   - Cloudinary integration for image storage
+   - Multer middleware for file parsing
+   - SHA-256 checksum-based deduplication
+
+4. **Admin UI**
+   - Pet forms now include image upload field
+   - Support for multiple images per pet
+   - Image sequencing/ordering
+
+**Benefits:**
+- Cloud-based image storage (no local file handling)
+- CDN delivery for fast load times
+- Deduplication prevents storage of duplicate files
+- Unlimited number of images per pet
+- Image transforms possible via Cloudinary
+
+### tRPC → REST API Migration (v1.0.0)
 
 **Why Migrate?**
 1. REST is more universal and easier to integrate with external tools
@@ -1312,14 +1512,17 @@ Key design decisions:
 ### Planned Features
 - [ ] Email notifications for application status changes
 - [ ] Pet search with Algolia/Elasticsearch
-- [ ] Image upload with Cloudinary/S3
 - [ ] Advanced filters (location, size, temperament)
 - [ ] Favorites/watchlist for pets
 - [ ] Pet availability alerts
-- [ ] Multi-image galleries per pet
 - [ ] Admin analytics dashboard
 - [ ] PDF export for applications
 - [ ] Pagination with infinite scroll option
+- [ ] Image transformation/optimization with Cloudinary
+- [ ] Batch image upload (zip files)
+- [ ] User-submitted pet listings (community pets)
+- [ ] Social media integration (share pet listings)
+- [ ] Pet microchip registration tracking
 
 ### Technical Improvements
 - [ ] Redis for session management
@@ -1328,9 +1531,13 @@ Key design decisions:
 - [ ] API versioning (`/api/v1/...`)
 - [ ] OpenAPI/Swagger documentation
 - [ ] E2E tests with Playwright
-- [ ] CI/CD pipeline
+- [ ] Unit tests for controllers & hooks
+- [ ] CI/CD pipeline (GitHub Actions)
 - [ ] Docker containerization
 - [ ] Kubernetes deployment config
+- [ ] GraphQL API layer (in addition to REST)
+- [ ] WebSocket support for real-time updates
+- [ ] Image caching/CDN optimization
 
 ---
 
@@ -1351,7 +1558,27 @@ Gunjan Dalwadi
 
 ## Changelog
 
-### v1.1.0 (Current)
+### v1.2.0 (Current)
+- ✅ **Image Upload & Management System**
+  - Integrated Cloudinary for cloud-based image storage
+  - Created `media` and `pet_media` database tables
+  - Implemented `POST /api/media/upload` endpoint with multer
+  - Built `ImageUploadField` component for drag-drop file uploads
+  - Built `ImageSlider` component for multi-image carousels
+  - Support for multiple images per pet with sequence ordering
+  - SHA-256 checksum-based deduplication
+  - Automatic file validation (type, size)
+- ✅ **Enhanced Pet Detail Page**
+  - Image carousel/slider with navigation buttons
+  - Support for 1+ images per pet
+  - Fallback to paw emoji when no images
+- ✅ **Admin Pet Management Updates**
+  - Image upload directly in pet form
+  - Multiple image support in add/edit modals
+  - Image sequencing/ordering capability
+  - Delete images functionality
+
+### v1.1.0
 - ✅ **Server-Side Filtering Implementation**
   - Migrated from client-side to server-side filtering for pets
   - Added search by name, breed filtering, age range filtering
@@ -1366,7 +1593,7 @@ Gunjan Dalwadi
   - Updated Zod validation schemas for all filters
   - Optimized database queries with proper indexing support
 
-### v1.0.0 (Previous)
+### v1.0.0
 - ✅ Complete migration from tRPC to REST API
 - ✅ Amber/warm design theme implementation
 - ✅ Full CRUD for pets (admin)
@@ -1382,5 +1609,5 @@ Gunjan Dalwadi
 
 ---
 
-**Last Updated:** April 18, 2026
-**Documentation Version:** 1.1.0
+**Last Updated:** April 27, 2026
+**Documentation Version:** 1.2.0

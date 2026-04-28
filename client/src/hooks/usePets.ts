@@ -13,7 +13,7 @@ export interface UsePetsResult {
   refetch:    () => void;
 }
 
-export const usePets = (filters: PetFilters = {}): UsePetsResult => {
+export const usePets = (filters: PetFilters & { signal?: AbortSignal } = {}): UsePetsResult => {
   const [pets,       setPets]       = useState<Pet[]>([]);
   const [total,      setTotal]      = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -26,6 +26,8 @@ export const usePets = (filters: PetFilters = {}): UsePetsResult => {
   const hasData      = useRef(false); // tracks whether we've ever received data
 
   useEffect(() => {
+    const abortController = new AbortController();
+    const signal = filters.signal ?? abortController.signal;
     let cancelled = false;
 
     // Only show full skeletons when we have no data yet
@@ -36,26 +38,31 @@ export const usePets = (filters: PetFilters = {}): UsePetsResult => {
     setError(null);
 
     petsApi
-      .getAll(JSON.parse(filtersKey) as PetFilters)
+      .getAll(JSON.parse(filtersKey) as PetFilters, signal)
       .then(({ data, pagination }) => {
-        if (cancelled) return;
+        if (signal.aborted || cancelled) return;
         setPets(data);
         setTotal(pagination.total);
         setTotalPages(pagination.totalPages);
         hasData.current = true;
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (signal.aborted || cancelled) return;
         console.log("error",err);
         setError(err?.response?.data?.message ?? "Failed to load pets");
       })
       .finally(() => {
-        if (cancelled) return;
+        if (signal.aborted || cancelled) return;
         setIsLoading(false);
         setIsFetching(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (!filters.signal) {
+        abortController.abort();  // Only abort if we created it
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersKey, tick]);
 
