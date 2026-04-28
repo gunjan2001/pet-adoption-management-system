@@ -1,8 +1,9 @@
 // src/pages/PetListing.tsx
+import ErrorBoundaryUI from "@/components/ErrorBoundaryUI";
 import { usePets } from "@/hooks/usePets";
 import type { PetStatus } from "@/types";
 import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 
 const LIMIT = 12;
@@ -17,6 +18,7 @@ const inp = "w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-
 
 export default function PetListing() {
   const [search,  setSearch]  = useState("");
+  const [searchValue,  setSearchValue]  = useState("");
   const [species, setSpecies] = useState("");
   const [breed,   setBreed]   = useState("");
   const [status,  setStatus]  = useState<PetStatus | "">("");
@@ -24,16 +26,65 @@ export default function PetListing() {
   const [maxAge,  setMaxAge]  = useState(20);
   const [page,    setPage]    = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
-  const { pets, totalPages, isLoading, isFetching, error, refetch } = usePets({
-    limit:   LIMIT,
+  // const { pets, totalPages, isLoading, isFetching, error, refetch } = usePets({
+  //   limit:   LIMIT,
+  //   page,
+  //   search:  search  || undefined,
+  //   species: species || undefined,
+  //   breed:   breed   || undefined,
+  //   status:  (status || undefined) as PetStatus | undefined,
+  //   minAge:  minAge * 12,
+  //   maxAge:  maxAge * 12,
+  // });
+
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const debouncedSetSearch = useCallback((value: string) => {
+      // Cancel previous debounce and API
+      if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // New abort controller for this search
+      abortControllerRef.current = new AbortController();
+
+      // Debounce: only update after 300ms idle + min length
+      debounceTimeoutRef.current = setTimeout(() => {
+        if (value.length >= 3) {
+          setSearchValue(value);
+          setPage(1);
+        }
+      }, 300);
+    }, []);
+
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearch(e.target.value);
+      debouncedSetSearch(e.target.value);
+    };
+
+  // Cleanup on unmount/new search
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, []);
+
+  // Update usePets call (add signal)
+  const {pets, totalPages, isLoading, isFetching, error, refetch} = usePets({
+    limit: LIMIT,
     page,
-    search:  search  || undefined,
+    search: searchValue || undefined,
     species: species || undefined,
-    breed:   breed   || undefined,
-    status:  (status || undefined) as PetStatus | undefined,
-    minAge:  minAge * 12,
-    maxAge:  maxAge * 12,
+    breed: breed || undefined,
+    status: status as PetStatus || undefined,
+    minAge: minAge * 12,
+    maxAge: maxAge * 12,
+    signal: abortControllerRef.current?.signal,  // Pass for cancellation
   });
 
   const pageNumbers = useMemo(() => {
@@ -50,8 +101,8 @@ export default function PetListing() {
 
   const clearAll = () => {
     setSearch(""); setSpecies(""); setBreed(""); setStatus("");
-    setMinAge(0); setMaxAge(20); setPage(1);
-  };
+    setMinAge(0); setMaxAge(20); setPage(1); setRetryCount(0);
+  };  
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50/60 to-white">
@@ -72,7 +123,7 @@ export default function PetListing() {
               type="text"
               placeholder="Search by name…"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={handleSearchChange}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm shadow-sm"
             />
             {search && (
@@ -80,6 +131,11 @@ export default function PetListing() {
                 <X className="w-4 h-4" />
               </button>
             )}
+            {/* {search.length > 0 && search.length < 3 && (
+              <p className="absolute left-10 top-full mt-1 text-xs text-red-500">
+                Enter 3+ characters to search
+              </p>
+            )} */}
           </div>
           <button
             onClick={() => setShowFilters((s) => !s)}
@@ -156,12 +212,17 @@ export default function PetListing() {
 
         {/* ── Error ────────────────────────────────────────────────────────── */}
         {error && (
-          <div className="text-center py-10">
-            <p className="text-red-500 mb-4">{error}</p>
-            <button onClick={refetch} className="px-5 py-2.5 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition-colors">
-              Try again
-            </button>
-          </div>
+          <ErrorBoundaryUI
+            error={error}
+            onRetry={() => {
+              setRetryCount(prev => prev + 1);
+              refetch();
+            }}
+            onClearFilters={clearAll}
+            isLoading={isLoading}
+            retryCount={retryCount}
+            maxRetries={3}
+          />
         )}
 
         {/* ── Grid ─────────────────────────────────────────────────────────── */}
