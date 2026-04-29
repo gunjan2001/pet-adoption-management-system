@@ -1,4 +1,7 @@
 // src/contexts/AuthContext.tsx
+import { TOKEN_KEY, USER_KEY } from "@/const";
+import { authApi } from "@/lib/api/auth.api";
+import { LoginInput, RegisterInput, User } from "@/types";
 import React, {
   createContext,
   useCallback,
@@ -7,9 +10,6 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { authApi } from "@/lib/api/auth.api";
-import { TOKEN_KEY, USER_KEY } from "@/const";
-import { User, LoginInput, RegisterInput } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface AuthContextValue {

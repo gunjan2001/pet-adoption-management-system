@@ -118,8 +118,6 @@ export default function AdminManagePets() {
     e.preventDefault();
     setSaving(true);
     try {
-      console.log("form", form);
-
       // Extract media IDs from media items
       const mediaIds = form.mediaItems.map(item => item.id);
 
