@@ -234,7 +234,7 @@ export default function PetListing() {
         </div>
       ) : (
         !error && (
-          <div className="relative">
+          <div className="container mx-auto max-w-7xl py-8">
             {/* Thin refetch indicator */}
             <div
               className={`absolute -top-3 left-0 right-0 h-0.5 rounded-full bg-amber-400 origin-left transition-all duration-300 ${isFetching ? 'opacity-100 animate-pulse' : 'opacity-0'}`}
