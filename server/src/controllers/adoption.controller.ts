@@ -10,6 +10,26 @@ import {
   ReviewApplicationInput,
 } from "../validators/schemas.js";
 
+// ── Helper: Get pet images from database ──────────────────────────────────────
+async function getPetImages(petId: number) {
+  const petImages = await db
+    .select({
+      id: media.id,
+      checksum: media.checksum,
+      sequence: petMedia.sequence,
+    })
+    .from(petMedia)
+    .innerJoin(media, eq(petMedia.mediaId, media.id))
+    .where(eq(petMedia.petId, petId))
+    .orderBy(petMedia.sequence);
+
+  return petImages.map(img => ({
+    id: img.id,
+    url: generateImageUrl(img.checksum) || null,
+    sequence: img.sequence,
+  }));
+}
+
 // ── Submit Application (authenticated user) ───────────────────────────────────
 export const submitApplication = async (
   req: Request<{}, {}, CreateApplicationInput>,
@@ -98,7 +118,6 @@ export const getMyApplications = async (
           name: pets.name,
           species: pets.species,
           breed: pets.breed,
-          imageUrl: pets.imageUrl,
           status: pets.status,
         },
       })
@@ -107,28 +126,19 @@ export const getMyApplications = async (
       .where(eq(adoptionApplications.userId, userId))
       .orderBy(adoptionApplications.createdAt);
 
-      const petsWithImages = await Promise.all(
-        rows.map(async (pet) => {
-          const petImages = await db
-            .select({
-              id: media.id,
-              checksum: media.checksum,
-              sequence: petMedia.sequence,
-            })
-            .from(petMedia)
-            .innerJoin(media, eq(petMedia.mediaId, media.id))
-            .where(eq(petMedia.petId, pet.pet.id))
-            .orderBy(petMedia.sequence);
-  
-          const imgUrl = generateImageUrl(petImages[0]?.checksum || null);
-          
-          const responseData = {...pet, pet: { ...pet.pet, imageUrl: imgUrl } };
-          return responseData;
-        })
-      );
-
-      console.log("petsWithImages",petsWithImages);
-      
+    const petsWithImages = await Promise.all(
+      rows.map(async (row) => {
+        const images = await getPetImages(row.pet.id);
+        return {
+          ...row,
+          pet: {
+            ...row.pet,
+            images,
+            imageUrl: images[0]?.url || null, // For backward compatibility
+          },
+        };
+      })
+    );
 
     res.status(200).json({ success: true, data: petsWithImages });
   } catch (error) {
@@ -157,7 +167,6 @@ export const getApplicationById = async (
           name: pets.name,
           species: pets.species,
           breed: pets.breed,
-          imageUrl: pets.imageUrl,
         },
         applicant: {
           id: users.id,
@@ -186,7 +195,18 @@ export const getApplicationById = async (
       return;
     }
 
-    res.status(200).json({ success: true, data: row });
+    // Fetch images for the pet
+    const images = await getPetImages(row.pet.id);
+    const responseData = {
+      ...row,
+      pet: {
+        ...row.pet,
+        images,
+        imageUrl: images[0]?.url || null, // For backward compatibility
+      },
+    };
+
+    res.status(200).json({ success: true, data: responseData });
   } catch (error) {
     console.error("Get application error:", error);
     res.status(500).json({ success: false, message: "Internal server error" });
@@ -220,7 +240,6 @@ export const getAllApplications = async (
             id: pets.id,
             name: pets.name,
             species: pets.species,
-            imageUrl: pets.imageUrl,
           },
           applicant: {
             id: users.id,
@@ -241,9 +260,24 @@ export const getAllApplications = async (
         .where(filter),
     ]);
 
+    // Fetch images for each pet
+    const applicationsWithImages = await Promise.all(
+      rows.map(async (row) => {
+        const images = await getPetImages(row.pet.id);
+        return {
+          ...row,
+          pet: {
+            ...row.pet,
+            images,
+            imageUrl: images[0]?.url || null, // For backward compatibility
+          },
+        };
+      })
+    );
+
     res.status(200).json({
       success: true,
-      data: rows,
+      data: applicationsWithImages,
       pagination: {
         total: count,
         page,

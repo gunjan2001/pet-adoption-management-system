@@ -63,8 +63,6 @@ export default function ImageUploadField({
 
         if (!response.ok) {
           const error = await response.json();
-          console.log("error", response);
-
           throw new Error(error.error || "Upload failed");
         }
 

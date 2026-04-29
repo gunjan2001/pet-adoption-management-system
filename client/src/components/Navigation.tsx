@@ -1,10 +1,17 @@
-import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
-  Menu, X, LogIn, UserPlus, LogOut, LayoutGrid,
-  PawPrint, ClipboardList, LayoutDashboard, ChevronDown,
+  ChevronDown,
+  ClipboardList, LayoutDashboard,
+  LayoutGrid,
+  LogIn,
+  LogOut,
+  Menu,
+  PawPrint,
+  UserPlus,
+  X,
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "wouter";
 
 // ── Hook: close a dropdown when clicking outside ─────────────────────────────
 function useClickOutside(ref: React.RefObject<HTMLElement>, cb: () => void) {
@@ -304,7 +311,7 @@ export default function Navigation() {
                   onClick={handleLogout}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-sm text-red-600 font-medium hover:bg-red-50 transition-colors"
                 >
-                  <LogOut className="w-3.5 h-3.5" /> Out
+                  <LogOut className="w-3.5 h-3.5" /> Sign Out
                 </button>
               </div>
             ) : (

@@ -1,13 +1,11 @@
 // src/pages/AdminApplications.tsx
-import { useState } from "react";
-import { useLocation } from "wouter";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { useAllApplications } from "@/hooks/useAdoptions";
 import { adoptionsApi } from "@/lib/api/adoptions.api";
 import { getErrorMessage } from "@/lib/errorHandler";
-import { toast } from "sonner";
-import { ArrowLeft, CheckCircle, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import type { AdoptionStatus, ApplicationWithPetAndApplicant } from "@/types";
+import { CheckCircle, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 const STATUS_STYLES: Record<AdoptionStatus, string> = {
   pending:  "bg-amber-100 text-amber-800",
@@ -16,8 +14,6 @@ const STATUS_STYLES: Record<AdoptionStatus, string> = {
 };
 
 export default function AdminApplications() {
-  const { logout } = useAuth();
-  const [, navigate] = useLocation();
 
   // ── Filters + Pagination ──────────────────────────────────────────────────
   const [statusFilter, setStatusFilter] = useState<AdoptionStatus | "all">("all");
