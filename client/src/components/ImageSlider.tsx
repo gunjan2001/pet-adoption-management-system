@@ -1,6 +1,15 @@
 // src/components/ImageSlider.tsx
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
+import type { Swiper as SwiperType } from "swiper";
+import { A11y, Keyboard, Navigation, Pagination, Thumbs } from "swiper/modules";
+import { Swiper, SwiperSlide } from "swiper/react";
+
+// Core styles — always required
+import "swiper/css";
+// Module styles
+import "swiper/css/navigation";
+import "swiper/css/pagination";
+import "swiper/css/thumbs";
 
 interface ImageSliderProps {
   images: { id: number; url: string | null }[];
@@ -8,9 +17,9 @@ interface ImageSliderProps {
 }
 
 export default function ImageSlider({ images, alt }: ImageSliderProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [thumbsSwiper, setThumbsSwiper] = useState<SwiperType | null>(null);
 
-  // If no images, show placeholder
+  // ── Fallbacks ─────────────────────────────────────────────────────────────
   if (!images || images.length === 0) {
     return (
       <div className="aspect-square w-full rounded-3xl bg-amber-50 flex items-center justify-center border border-amber-100">
@@ -19,100 +28,143 @@ export default function ImageSlider({ images, alt }: ImageSliderProps) {
     );
   }
 
-  // If only one image, show it without navigation
   if (images.length === 1) {
     return (
       <div className="aspect-square w-full rounded-3xl overflow-hidden bg-gray-50 border border-gray-100">
         <img
           src={images[0]?.url ?? ""}
           alt={alt}
+          draggable={false}
           className="w-full h-full object-cover"
         />
       </div>
     );
   }
 
-  const goToPrevious = () => {
-    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-  };
-
-  const goToNext = () => {
-    setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-  };
-
-  const goToImage = (index: number) => {
-    setCurrentIndex(index);
-  };
-
+  // ── Multi-image Swiper ────────────────────────────────────────────────────
   return (
-    <div className="space-y-4">
-      {/* Main Image */}
-      <div className="relative aspect-square w-full rounded-3xl overflow-hidden bg-gray-50 border border-gray-100 group">
-        <img
-          src={images[currentIndex]?.url ?? ""}
-          alt={`${alt} - Image ${currentIndex + 1}`}
-          className="w-full h-full object-cover"
-        />
+    <div className="space-y-3">
 
-        {/* Navigation Arrows */}
-        <button
-          onClick={goToPrevious}
-          className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 hover:bg-white text-gray-800 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-          aria-label="Previous image"
+      {/* ── Main slider ─────────────────────────────────────────────────── */}
+      <div className="image-slider-main rounded-3xl overflow-hidden">
+        <Swiper
+          modules={[Navigation, Pagination, Thumbs, Keyboard, A11y]}
+          // Touch / swipe — Swiper handles this natively out of the box
+          touchStartPreventDefault={false}   // don't block native scroll intent
+          touchReleaseOnEdges               // hand back scroll at the first/last slide
+          // Navigation arrows
+          navigation={{
+            prevEl: ".swiper-btn-prev",
+            nextEl: ".swiper-btn-next",
+          }}
+          // Dot pagination
+          pagination={{ clickable: true, dynamicBullets: true }}
+          // Thumbnail sync
+          thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }}
+          // Keyboard arrow-key support
+          keyboard={{ enabled: true, onlyInViewport: true }}
+          // Accessibility
+          a11y={{ prevSlideMessage: "Previous image", nextSlideMessage: "Next image" }}
+          loop={images.length > 1}
+          className="relative aspect-square w-full bg-gray-50"
         >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
+          {images.map((image, i) => (
+            <SwiperSlide key={image.id}>
+              <img
+                src={image.url ?? ""}
+                alt={`${alt} — image ${i + 1}`}
+                draggable={false}
+                className="w-full h-full object-cover"
+              />
+            </SwiperSlide>
+          ))}
 
-        <button
-          onClick={goToNext}
-          className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 hover:bg-white text-gray-800 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-          aria-label="Next image"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-
-        {/* Image Counter */}
-        <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-full bg-black/60 text-white text-sm font-medium">
-          {currentIndex + 1} / {images.length}
-        </div>
-      </div>
-
-      {/* Thumbnail Navigation */}
-      <div className="grid grid-cols-5 gap-2">
-        {images.map((image, index) => (
+          {/* Custom nav buttons — styled to match project design system */}
           <button
-            key={index}
-            onClick={() => goToImage(index)}
-            className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-              index === currentIndex
-                ? "border-amber-500 ring-2 ring-amber-200"
-                : "border-gray-200 hover:border-amber-300 opacity-60 hover:opacity-100"
-            }`}
+            className="swiper-btn-prev absolute left-3 top-1/2 -translate-y-1/2 z-10
+                       w-10 h-10 rounded-full bg-white/90 hover:bg-white
+                       flex items-center justify-center shadow-lg
+                       transition-all hover:scale-105 active:scale-95
+                       disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Previous image"
           >
-            <img
-              src={image.url ?? ""}
-              alt={`${alt} thumbnail ${index + 1}`}
-              className="w-full h-full object-cover"
-            />
+            {/* Chevron left */}
+            <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+            </svg>
           </button>
-        ))}
+
+          <button
+            className="swiper-btn-next absolute right-3 top-1/2 -translate-y-1/2 z-10
+                       w-10 h-10 rounded-full bg-white/90 hover:bg-white
+                       flex items-center justify-center shadow-lg
+                       transition-all hover:scale-105 active:scale-95
+                       disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Next image"
+          >
+            {/* Chevron right */}
+            <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+            </svg>
+          </button>
+        </Swiper>
       </div>
 
-      {/* Dots indicator (mobile-friendly alternative) */}
-      <div className="flex justify-center gap-2 sm:hidden">
-        {images.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => goToImage(index)}
-            className={`w-2 h-2 rounded-full transition-all ${
-              index === currentIndex
-                ? "bg-amber-500 w-6"
-                : "bg-gray-300 hover:bg-amber-300"
-            }`}
-            aria-label={`Go to image ${index + 1}`}
-          />
-        ))}
+      {/* ── Thumbnail strip ──────────────────────────────────────────────── */}
+      <div className="image-slider-thumbs">
+        <Swiper
+          modules={[Thumbs]}
+          onSwiper={setThumbsSwiper}
+          slidesPerView="auto"
+          spaceBetween={8}
+          watchSlidesProgress          // required for thumbs module
+          className="!pb-1"
+        >
+          {images.map((image, i) => (
+            <SwiperSlide key={image.id} className="!w-16 cursor-pointer">
+              <div className="aspect-square w-16 rounded-xl overflow-hidden border-2 border-transparent transition-all swiper-thumb-slide">
+                <img
+                  src={image.url ?? ""}
+                  alt={`${alt} thumbnail ${i + 1}`}
+                  draggable={false}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </SwiperSlide>
+          ))}
+        </Swiper>
       </div>
+
+      {/* ── Scoped styles ────────────────────────────────────────────────── */}
+      <style>{`
+        /* Amber dot pagination to match design system */
+        .image-slider-main .swiper-pagination-bullet {
+          background: #D1D5DB;
+          opacity: 1;
+          width: 8px;
+          height: 8px;
+          transition: all 0.2s;
+        }
+        .image-slider-main .swiper-pagination-bullet-active {
+          background: #F59E0B;
+          width: 24px;
+          border-radius: 9999px;
+        }
+
+        /* Active thumbnail highlight */
+        .image-slider-thumbs .swiper-slide-thumb-active .swiper-thumb-slide {
+          border-color: #F59E0B;
+          box-shadow: 0 0 0 3px #FDE68A;
+          transform: scale(1.05);
+        }
+        .image-slider-thumbs .swiper-slide:not(.swiper-slide-thumb-active) .swiper-thumb-slide {
+          opacity: 0.55;
+        }
+        .image-slider-thumbs .swiper-slide:not(.swiper-slide-thumb-active):hover .swiper-thumb-slide {
+          opacity: 0.85;
+          border-color: #FCD34D;
+        }
+      `}</style>
     </div>
   );
 }
