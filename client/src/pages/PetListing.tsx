@@ -68,7 +68,7 @@ export default function PetListing() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50/60 to-white mb-5">
-      <div className="container mx-auto px-4 max-w-7xl py-12 md:py-15">
+      <div className="container mx-auto px-4 max-w-7xl py-12 md:py-15 md:pb-0">
         {/* ── Page header ─────────────────────────────────────────────────── */}
         <div className="mb-10">
           <p className="text-amber-600 font-bold text-sm uppercase tracking-widest mb-2">
@@ -217,7 +217,8 @@ export default function PetListing() {
 
       {/* ── Grid ─────────────────────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+         <div className="container mx-auto max-w-7xl py-8 pt-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 p-5">
           {Array.from({ length: 12 }).map((_, i) => (
             <div
               key={i}
@@ -232,9 +233,10 @@ export default function PetListing() {
             </div>
           ))}
         </div>
+        </div>
       ) : (
         !error && (
-          <div className="container mx-auto max-w-7xl py-8">
+          <div className="container mx-auto max-w-7xl py-8 pt-0">
             {/* Thin refetch indicator */}
             <div
               className={`absolute -top-3 left-0 right-0 h-0.5 rounded-full bg-amber-400 origin-left transition-all duration-300 ${isFetching ? 'opacity-100 animate-pulse' : 'opacity-0'}`}

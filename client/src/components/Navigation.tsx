@@ -1,7 +1,8 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuth } from '@/_core/hooks/useAuth';
 import {
   ChevronDown,
-  ClipboardList, LayoutDashboard,
+  ClipboardList,
+  LayoutDashboard,
   LayoutGrid,
   LogIn,
   LogOut,
@@ -9,9 +10,9 @@ import {
   PawPrint,
   UserPlus,
   X,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "wouter";
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation } from 'wouter';
 
 // ── Hook: close a dropdown when clicking outside ─────────────────────────────
 function useClickOutside(ref: React.RefObject<HTMLElement>, cb: () => void) {
@@ -19,32 +20,31 @@ function useClickOutside(ref: React.RefObject<HTMLElement>, cb: () => void) {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) cb();
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [ref, cb]);
 }
 
 // ── Admin Navigation ──────────────────────────────────────────────────────────
 function AdminNav() {
   const { user, logout } = useAuth();
-  const [, setLocation]  = useLocation();
-  const [location]       = useLocation();
-  const [open, setOpen]  = useState(false);
-  const menuRef          = useRef<HTMLDivElement>(null!);
+  const [, setLocation] = useLocation();
+  const [location] = useLocation();
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null!);
   useClickOutside(menuRef, () => setOpen(false));
 
   const isActive = (path: string) => location === path;
 
   const links = [
-    { href: "/admin",              label: "Overview",     icon: LayoutGrid },
-    { href: "/admin/pets",         label: "Pets",         icon: PawPrint },
-    { href: "/admin/applications", label: "Applications", icon: ClipboardList },
+    { href: '/admin', label: 'Overview', icon: LayoutGrid },
+    { href: '/admin/pets', label: 'Pets', icon: PawPrint },
+    { href: '/admin/applications', label: 'Applications', icon: ClipboardList },
   ];
 
   return (
     <nav className="sticky top-0 z-50 bg-gray-900 border-b border-gray-700">
       <div className="container mx-auto px-4 max-w-7xl flex items-center justify-between h-16">
-
         {/* Logo */}
         <Link href="/admin">
           <span className="flex items-center gap-2.5 cursor-pointer group">
@@ -61,11 +61,13 @@ function AdminNav() {
         <div className="hidden md:flex items-center gap-1">
           {links.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href}>
-              <span className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
-                isActive(href)
-                  ? "bg-amber-500 text-gray-900"
-                  : "text-gray-300 hover:text-white hover:bg-gray-800"
-              }`}>
+              <span
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+                  isActive(href)
+                    ? 'bg-amber-500 text-gray-900'
+                    : 'text-gray-300 hover:text-white hover:bg-gray-800'
+                }`}
+              >
                 <Icon className="w-4 h-4" />
                 {label}
               </span>
@@ -78,7 +80,7 @@ function AdminNav() {
           {/* User pill */}
           <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-800 border border-gray-700">
             <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center text-gray-900 font-bold text-xs">
-              {(user?.name ?? user?.email ?? "A")[0].toUpperCase()}
+              {(user?.name ?? user?.email ?? 'A')[0].toUpperCase()}
             </div>
             <span className="text-gray-300 text-sm max-w-[120px] truncate">
               {user?.name ?? user?.email}
@@ -87,7 +89,10 @@ function AdminNav() {
 
           {/* Desktop logout */}
           <button
-            onClick={() => { logout(); setLocation("/"); }}
+            onClick={() => {
+              logout();
+              setLocation('/');
+            }}
             className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
           >
             <LogOut className="w-4 h-4" /> Logout
@@ -109,9 +114,11 @@ function AdminNav() {
                 <div className="px-4 py-3 border-b border-gray-700 bg-gray-800/50">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full bg-amber-500 flex items-center justify-center text-gray-900 font-bold text-xs flex-shrink-0">
-                      {(user?.name ?? user?.email ?? "A")[0].toUpperCase()}
+                      {(user?.name ?? user?.email ?? 'A')[0].toUpperCase()}
                     </div>
-                    <span className="text-gray-300 text-sm truncate">{user?.name ?? user?.email}</span>
+                    <span className="text-gray-300 text-sm truncate">
+                      {user?.name ?? user?.email}
+                    </span>
                   </div>
                 </div>
                 {/* Links */}
@@ -121,8 +128,8 @@ function AdminNav() {
                       onClick={() => setOpen(false)}
                       className={`flex items-center gap-3 px-4 py-3 text-sm cursor-pointer transition-colors ${
                         isActive(href)
-                          ? "bg-amber-500/20 text-amber-400 font-medium"
-                          : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                          ? 'bg-amber-500/20 text-amber-400 font-medium'
+                          : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                       }`}
                     >
                       <Icon className="w-4 h-4" /> {label}
@@ -131,7 +138,11 @@ function AdminNav() {
                 ))}
                 {/* Logout */}
                 <button
-                  onClick={() => { logout(); setLocation("/"); setOpen(false); }}
+                  onClick={() => {
+                    logout();
+                    setLocation('/');
+                    setOpen(false);
+                  }}
                   className="flex w-full items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-gray-800 transition-colors border-t border-gray-700"
                 >
                   <LogOut className="w-4 h-4" /> Logout
@@ -148,8 +159,8 @@ function AdminNav() {
 // ── Main (public/user) Navigation ─────────────────────────────────────────────
 export default function Navigation() {
   const { user, logout, isAuthenticated } = useAuth();
-  const [, setLocation]   = useLocation();
-  const [location]        = useLocation();
+  const [, setLocation] = useLocation();
+  const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null!);
@@ -158,11 +169,11 @@ export default function Navigation() {
   const isActive = (path: string) => location === path;
 
   // Render admin nav for admin users
-  if (isAuthenticated && user?.role === "admin") return <AdminNav />;
+  if (isAuthenticated && user?.role === 'admin') return <AdminNav />;
 
   const handleLogout = () => {
     logout();
-    setLocation("/");
+    setLocation('/');
     setMobileOpen(false);
     setUserMenuOpen(false);
   };
@@ -170,7 +181,6 @@ export default function Navigation() {
   return (
     <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
       <div className="container mx-auto px-4 max-w-7xl flex items-center justify-between h-16 md:h-18">
-
         {/* ── Logo ─────────────────────────────────────────────────────────── */}
         <Link href="/">
           <span className="flex items-center gap-2 cursor-pointer group">
@@ -186,17 +196,25 @@ export default function Navigation() {
         {/* ── Desktop links ────────────────────────────────────────────────── */}
         <div className="hidden md:flex items-center gap-1">
           <Link href="/pets">
-            <span className={`px-4 py-2 rounded-xl text-sm font-medium cursor-pointer transition-colors ${
-              isActive("/pets") ? "bg-amber-100 text-amber-700" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-            }`}>
+            <span
+              className={`px-4 py-2 rounded-xl text-sm font-medium cursor-pointer transition-colors ${
+                isActive('/pets')
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
               Browse Pets
             </span>
           </Link>
           {isAuthenticated && (
             <Link href="/dashboard">
-              <span className={`px-4 py-2 rounded-xl text-sm font-medium cursor-pointer transition-colors ${
-                isActive("/dashboard") ? "bg-amber-100 text-amber-700" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-              }`}>
+              <span
+                className={`px-4 py-2 rounded-xl text-sm font-medium cursor-pointer transition-colors ${
+                  isActive('/dashboard')
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
                 My Applications
               </span>
             </Link>
@@ -213,26 +231,31 @@ export default function Navigation() {
                 className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 hover:border-amber-300 hover:bg-amber-50 transition-colors group"
               >
                 <div className="w-7 h-7 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold text-xs">
-                  {(user?.name ?? user?.email ?? "U")[0].toUpperCase()}
+                  {(user?.name ?? user?.email ?? 'U')[0].toUpperCase()}
                 </div>
                 <span className="text-sm font-semibold text-gray-800 max-w-[120px] truncate">
                   {user?.name ?? user?.email}
                 </span>
-                <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${userMenuOpen ? "rotate-180" : ""}`} />
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+                />
               </button>
 
               {userMenuOpen && (
                 <div className="absolute right-0 top-12 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden z-50">
                   <div className="px-4 py-3 border-b border-gray-100 bg-amber-50/50">
                     <p className="text-xs text-gray-500">Signed in as</p>
-                    <p className="text-sm font-semibold text-gray-900 truncate">{user?.email}</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {user?.email}
+                    </p>
                   </div>
                   <Link href="/dashboard">
                     <span
                       onClick={() => setUserMenuOpen(false)}
                       className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
                     >
-                      <LayoutDashboard className="w-4 h-4 text-gray-400" /> My Applications
+                      <LayoutDashboard className="w-4 h-4 text-gray-400" /> My
+                      Applications
                     </span>
                   </Link>
                   <button
@@ -267,7 +290,11 @@ export default function Navigation() {
           onClick={() => setMobileOpen((o) => !o)}
           aria-label="Toggle menu"
         >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {mobileOpen ? (
+            <X className="w-5 h-5" />
+          ) : (
+            <Menu className="w-5 h-5" />
+          )}
         </button>
       </div>
 
@@ -275,20 +302,28 @@ export default function Navigation() {
       {mobileOpen && (
         <div className="md:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-1">
           <Link href="/pets">
-            <span onClick={() => setMobileOpen(false)}
+            <span
+              onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium cursor-pointer transition-colors ${
-                isActive("/pets") ? "bg-amber-100 text-amber-700" : "text-gray-700 hover:bg-gray-100"
-              }`}>
+                isActive('/pets')
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
               🐾 Browse Pets
             </span>
           </Link>
 
           {isAuthenticated && (
             <Link href="/dashboard">
-              <span onClick={() => setMobileOpen(false)}
+              <span
+                onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium cursor-pointer transition-colors ${
-                  isActive("/dashboard") ? "bg-amber-100 text-amber-700" : "text-gray-700 hover:bg-gray-100"
-                }`}>
+                  isActive('/dashboard')
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
                 <LayoutDashboard className="w-4 h-4" /> My Applications
               </span>
             </Link>
@@ -300,11 +335,15 @@ export default function Navigation() {
               <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-amber-50 border border-amber-100">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold text-xs">
-                    {(user?.name ?? user?.email ?? "U")[0].toUpperCase()}
+                    {(user?.name ?? user?.email ?? 'U')[0].toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900 leading-tight">{user?.name ?? "User"}</p>
-                    <p className="text-xs text-gray-500 truncate max-w-[150px]">{user?.email}</p>
+                    <p className="text-sm font-semibold text-gray-900 leading-tight">
+                      {user?.name ?? 'User'}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate max-w-[150px]">
+                      {user?.email}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -317,14 +356,18 @@ export default function Navigation() {
             ) : (
               <div className="space-y-2">
                 <Link href="/login">
-                  <span onClick={() => setMobileOpen(false)}
-                    className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors">
+                  <span
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
                     <LogIn className="w-4 h-4" /> Login
                   </span>
                 </Link>
                 <Link href="/register">
-                  <span onClick={() => setMobileOpen(false)}
-                    className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold cursor-pointer transition-colors">
+                  <span
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold cursor-pointer transition-colors"
+                  >
                     <UserPlus className="w-4 h-4" /> Create Free Account
                   </span>
                 </Link>
