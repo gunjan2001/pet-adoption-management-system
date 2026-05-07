@@ -1,74 +1,119 @@
 // src/hooks/usePets.ts
 import { petsApi } from "@/lib/api/pets.api";
 import { Pet, PetFilters } from "@/types";
+import axios from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface UsePetsResult {
   pets:       Pet[];
   total:      number;
   totalPages: number;
-  isLoading:  boolean;   // true only on FIRST load (no data yet)  → show skeletons
-  isFetching: boolean;   // true on EVERY fetch (incl. filter/page) → show subtle overlay
+  isLoading:  boolean;
+  isFetching: boolean;
+  isWakingUp: boolean;
   error:      string | null;
   refetch:    () => void;
 }
 
-export const usePets = (filters: PetFilters & { signal?: AbortSignal } = {}): UsePetsResult => {
+/**
+ * Returns true for ANY flavour of request cancellation:
+ *
+ *  - axios.isCancel()     → CancelToken-based (Axios v0 legacy)
+ *  - err.code === 'ERR_CANCELED'  → AbortController-based (Axios v1+)
+ *  - err.name === 'CanceledError' → same, different property
+ *  - err.name === 'AbortError'    → native fetch / some environments
+ *  - signal.aborted               → synchronous check as a final backstop
+ */
+function isCancellation(err: unknown, signal: AbortSignal): boolean {
+  if (signal.aborted)        return true;
+  if (axios.isCancel(err))   return true;
+  if (err instanceof Error) {
+    if (err.name === 'CanceledError') return true;
+    if (err.name === 'AbortError')    return true;
+    if ((err as any).code === 'ERR_CANCELED') return true;
+  }
+  return false;
+}
+
+export const usePets = (filters: PetFilters = {}): UsePetsResult => {
   const [pets,       setPets]       = useState<Pet[]>([]);
   const [total,      setTotal]      = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [isLoading,  setIsLoading]  = useState(true);  // skeleton on first paint
-  const [isFetching, setIsFetching] = useState(false); // subtle indicator on refetch
+  const [isLoading,  setIsLoading]  = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
+  const [isWakingUp, setIsWakingUp] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
   const [tick,       setTick]       = useState(0);
 
-  const filtersKey   = JSON.stringify(filters);
-  const hasData      = useRef(false); // tracks whether we've ever received data
+  const hasData = useRef(false);
 
+  // Serialise only the plain filter values — never include signal/functions.
+  // This is the sole effect dependency; it changes only when filters change.
+  const filtersKey = JSON.stringify({
+    limit:   filters.limit,
+    page:    filters.page,
+    species: filters.species,
+    breed:   filters.breed,
+    status:  filters.status,
+  });
+
+  // ── NeonDB cold-start events ──────────────────────────────────────────────
   useEffect(() => {
-    const abortController = new AbortController();
-    const signal = filters.signal ?? abortController.signal;
-    let cancelled = false;
+    const onWaking = () => setIsWakingUp(true);
+    const onAwake  = () => setIsWakingUp(false);
+    window.addEventListener("db:waking", onWaking);
+    window.addEventListener("db:awake",  onAwake);
+    return () => {
+      window.removeEventListener("db:waking", onWaking);
+      window.removeEventListener("db:awake",  onAwake);
+    };
+  }, []);
 
-    // Only show full skeletons when we have no data yet
-    if (!hasData.current) {
-      setIsLoading(true);
-    }
+  // ── Fetch ─────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    if (!hasData.current) setIsLoading(true);
     setIsFetching(true);
     setError(null);
 
+    // Parse the stable key back into filters so the effect closure is free of
+    // the `filters` object (avoids stale-closure / identity-change issues).
+    const parsedFilters = JSON.parse(filtersKey) as PetFilters;
+
     petsApi
-      .getAll(JSON.parse(filtersKey) as PetFilters, signal)
+      .getAll(parsedFilters, signal)
       .then(({ data, pagination }) => {
-        if (signal.aborted || cancelled) return;
+        if (signal.aborted) return;
         setPets(data);
         setTotal(pagination.total);
         setTotalPages(pagination.totalPages);
         hasData.current = true;
       })
-      .catch((err) => {
-        if (signal.aborted || cancelled) return;
-        console.log("error",err);
-        setError(err?.response?.data?.message ?? "Failed to load pets");
+      .catch((err: unknown) => {
+        // Swallow every variety of intentional cancellation silently.
+        if (isCancellation(err, signal)) return;
+        
+        console.error("usePets fetch error:", err);
+        setError((err as any)?.response?.data?.message ?? "Failed to load pets");
       })
       .finally(() => {
-        if (signal.aborted || cancelled) return;
+        // Don't touch state if this run was aborted — the next run owns state.
+        if (signal.aborted) return;
         setIsLoading(false);
         setIsFetching(false);
+        setIsWakingUp(false);
       });
 
-    return () => {
-      cancelled = true;
-      if (!filters.signal) {
-        abortController.abort();  // Only abort if we created it
-      }
-    };
+    return () => controller.abort();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersKey, tick]);
 
   const refetch = useCallback(() => setTick((t) => t + 1), []);
 
-  return { pets, total, totalPages, isLoading, isFetching, error, refetch };
+  return { pets, total, totalPages, isLoading, isFetching, isWakingUp, error, refetch };
 };
 
 // ── usePet (single) ──────────────────────────────────────────────────────────
@@ -87,20 +132,34 @@ export const usePet = (id: number | undefined): UsePetResult => {
 
   useEffect(() => {
     if (!id) return;
-    let cancelled = false;
+
+    const controller = new AbortController();
+    const { signal } = controller;
+
     setIsLoading(true);
     setError(null);
 
     petsApi
       .getById(id)
-      .then((data) => { if (!cancelled) setPet(data); })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err?.response?.data?.message ?? "Pet not found");
+      .then((data) => {
+        if (signal.aborted) return;
+        setPet(data);
       })
-      .finally(() => { if (!cancelled) setIsLoading(false); });
+      .catch((err: unknown) => {
+        if (signal.aborted || axios.isCancel(err)) return;
+        if (err instanceof Error && (
+          err.name === 'CanceledError' ||
+          err.name === 'AbortError' ||
+          (err as any).code === 'ERR_CANCELED'
+        )) return;
+        setError((err as any)?.response?.data?.message ?? "Pet not found");
+      })
+      .finally(() => {
+        if (signal.aborted) return;
+        setIsLoading(false);
+      });
 
-    return () => { cancelled = true; };
+    return () => controller.abort();
   }, [id, tick]);
 
   const refetch = useCallback(() => setTick((t) => t + 1), []);
