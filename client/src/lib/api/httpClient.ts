@@ -9,14 +9,45 @@ import axios from "axios";
 /** 5xx codes that indicate a transient infra/DB error (e.g. NeonDB cold-start). */
 const RETRYABLE_STATUS_CODES = new Set([500, 502, 503, 504]);
 
-/** Delay before the single retry attempt — gives NeonDB time to resume. */
-const COLD_START_RETRY_DELAY_MS = 3_000;
+/**
+ * Axios error codes that indicate a cold NeonDB / slow-starting Render dyno
+ * rather than a real application error:
+ *   ECONNABORTED — request timed out (Axios timeout option exceeded)
+ *   ERR_NETWORK  — TCP connection refused / no response at all
+ */
+const RETRYABLE_ERROR_CODES = new Set(["ECONNABORTED", "ERR_NETWORK"]);
+
+/** Delay before the single retry attempt — gives NeonDB + Render dyno time to resume. */
+const COLD_START_RETRY_DELAY_MS = 5_000;
+
+// ---------------------------------------------------------------------------
+// Custom DOM event
+//
+// Fired on `window` right before the retry so any component in the tree can
+// listen and show a "waking up" banner — no prop-drilling or global store needed.
+//
+// Usage in a component:
+//   useEffect(() => {
+//     const on  = () => setWakingUp(true);
+//     const off = () => setWakingUp(false);
+//     window.addEventListener('db:waking',  on);
+//     window.addEventListener('db:awake',   off);
+//     return () => {
+//       window.removeEventListener('db:waking', on);
+//       window.removeEventListener('db:awake',  off);
+//     };
+//   }, []);
+// ---------------------------------------------------------------------------
+
+export function emitDbWaking() {
+  window.dispatchEvent(new CustomEvent("db:waking"));
+}
+export function emitDbAwake() {
+  window.dispatchEvent(new CustomEvent("db:awake"));
+}
 
 // ---------------------------------------------------------------------------
 // Extend Axios config to carry a retry flag
-//
-// This is the standard pattern for preventing infinite retry loops:
-// stamp the config object on the first failure; bail out on the second.
 // ---------------------------------------------------------------------------
 
 interface RetryableConfig extends InternalAxiosRequestConfig {
@@ -24,7 +55,7 @@ interface RetryableConfig extends InternalAxiosRequestConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Axios instance — identical to your original
+// Axios instance
 // ---------------------------------------------------------------------------
 
 const api = axios.create({
@@ -34,7 +65,7 @@ const api = axios.create({
 });
 
 // ---------------------------------------------------------------------------
-// Request interceptor: attach JWT if present — unchanged
+// Request interceptor: attach JWT if present
 // ---------------------------------------------------------------------------
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
@@ -53,7 +84,6 @@ api.interceptors.response.use(
   (response) => response,
 
   async (error: AxiosError) => {
-    // Always log — same as your original
     console.error(
       "API Error:",
       error.response?.status,
@@ -62,8 +92,21 @@ api.interceptors.response.use(
 
     const config = error.config as RetryableConfig | undefined;
     const status = error.response?.status;
+    const code   = error.code; // e.g. "ECONNABORTED", "ERR_NETWORK", "ERR_CANCELED"
 
-    // ── 1. 401: token expired/invalid — unchanged ──────────────────────────
+    // Silently ignore aborted requests (AbortController / StrictMode cleanup)
+    // — these are intentional cancellations, not real errors.
+    if (code === "ERR_CANCELED" || error.name === "CanceledError") {
+      return Promise.reject(error);
+    }
+
+    console.error(
+      "API Error:",
+      status ?? code,
+      error.response?.data || error.message,
+    );
+
+    // ── 1. 401: token expired/invalid ─────────────────────────────────────
     if (status === 401) {
       localStorage.removeItem(TOKEN_KEY);
       if (window.location.pathname !== "/login") {
@@ -74,18 +117,14 @@ api.interceptors.response.use(
 
     // ── 2. NeonDB cold-start retry ─────────────────────────────────────────
     //
-    // Retry once when:
-    //   • the response is a transient 5xx (infra/DB error)
-    //   • we have a config to replay the request with
-    //   • this specific request hasn't been retried yet (prevents loops)
+    // Retry once on:
+    //   a) 5xx HTTP responses  — server/DB error after the dyno woke up
+    //   b) Timeout / no-response — dyno or NeonDB hasn't finished waking yet
     //
-    if (
-      config &&
-      status !== undefined &&
-      RETRYABLE_STATUS_CODES.has(status) &&
-      !config._hasBeenRetried
-    ) {
-      config._hasBeenRetried = true; // ← loop guard
+    const isRetryableStatus = status !== undefined && RETRYABLE_STATUS_CODES.has(status);
+    const isRetryableCode   = code !== undefined   && RETRYABLE_ERROR_CODES.has(code);
+    if (config && (isRetryableStatus || isRetryableCode) && !config._hasBeenRetried) {
+      config._hasBeenRetried = true;
 
       console.warn(
         `NeonDB may be resuming from suspension. ` +
@@ -93,13 +132,26 @@ api.interceptors.response.use(
           `(${error.config?.url})`,
       );
 
+      // 🔔 Tell the UI the DB is waking up BEFORE the delay
+      emitDbWaking();
+
       await new Promise((resolve) =>
         setTimeout(resolve, COLD_START_RETRY_DELAY_MS),
       );
 
-      // Re-issue the original request. The request interceptor above will
-      // re-attach the JWT header automatically, so nothing extra is needed.
-      return api(config);
+      try {
+        // Give the retry more breathing room — the dyno just woke up and may
+        // still be establishing the NeonDB connection pool.
+        config.timeout = 30_000;
+        const result = await api(config);
+        // ✅ Retry succeeded — tell the UI we're back
+        emitDbAwake();
+        return result;
+      } catch (retryError) {
+        // ❌ Retry also failed — clear the banner and propagate
+        emitDbAwake();
+        return Promise.reject(retryError);
+      }
     }
 
     // ── 3. Everything else — propagate to the caller ───────────────────────
@@ -108,45 +160,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-
-// ToDO:
-
-// // src/lib/httpClient.ts
-// // Axios instance wired to the Express REST backend
-
-// import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
-// import { API_BASE_URL, TOKEN_KEY } from "@/const";
-
-// const api = axios.create({
-//   baseURL: API_BASE_URL,
-//   headers: { "Content-Type": "application/json" },
-//   timeout: 15_000,
-// });
-
-// // ── Request interceptor: attach JWT if present ─────────────────────────────
-// api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-//   const token = localStorage.getItem(TOKEN_KEY);
-//   if (token && config.headers) {
-//     config.headers.Authorization = `Bearer ${token}`;
-//   }
-//   return config;
-// });
-
-// // ── Response interceptor: auto-logout on 401 ──────────────────────────────
-// api.interceptors.response.use(
-//   (response) => response,
-//   (error: AxiosError) => {
-//     console.error("API Error:", error.response?.status, error.response?.data || error.message);
-//     if (error.response?.status === 401) {
-//       // Token expired or invalid — clear storage and redirect to login
-//       localStorage.removeItem(TOKEN_KEY);
-//       // Avoid circular import: use window.location instead of router
-//       if (window.location.pathname !== "/login") {
-//         window.location.href = "/login";
-//       }
-//     }
-//     return Promise.reject(error);
-//   }
-// );
-
-// export default api;

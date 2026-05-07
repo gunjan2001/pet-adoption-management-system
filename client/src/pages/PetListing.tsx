@@ -32,14 +32,88 @@ const STATUS_BADGE: Record<
 const inp =
   'w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-shadow text-sm';
 
+// ---------------------------------------------------------------------------
+// WakingUpBanner
+//
+// Shown in place of the skeleton grid while httpClient waits for NeonDB to
+// resume from suspension. Keeps the filter panel visible so the user knows
+// they're on the right page and can still tweak filters.
+// ---------------------------------------------------------------------------
+function WakingUpBanner() {
+  return (
+    <div className="container mx-auto max-w-7xl px-4 py-8 pt-0">
+      <div className="flex flex-col items-center justify-center gap-5 py-20 bg-white rounded-3xl border border-amber-100 shadow-sm">
+        {/* Animated paw dots */}
+        <div className="flex gap-2 items-end h-10">
+          {['🐾', '🐾', '🐾'].map((paw, i) => (
+            <span
+              key={i}
+              className="text-2xl"
+              style={{
+                animation: 'wakeBounce 1.2s ease-in-out infinite',
+                animationDelay: `${i * 0.2}s`,
+                display: 'inline-block',
+              }}
+            >
+              {paw}
+            </span>
+          ))}
+        </div>
+
+        <div className="text-center space-y-1.5">
+          <p className="text-lg font-bold text-gray-800">
+            Fetching pets for you…
+          </p>
+          <p className="text-sm text-gray-500 max-w-xs">
+            Our server is warming up 🐣 — your furry friends will appear in just
+            a moment!
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        <div className="w-48 h-1.5 bg-amber-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-amber-400 rounded-full origin-left"
+            style={{ animation: 'wakeProgress 3s ease-in-out forwards' }}
+          />
+        </div>
+      </div>
+
+      {/* Keyframes injected inline — no CSS file needed */}
+      <style>{`
+        @keyframes wakeBounce {
+          0%, 100% { transform: translateY(0);    opacity: 0.5; }
+          50%       { transform: translateY(-8px); opacity: 1;   }
+        }
+        @keyframes wakeProgress {
+          from { width: 0%;   }
+          to   { width: 100%; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PetListing
+// ---------------------------------------------------------------------------
 export default function PetListing() {
+  
   const [species, setSpecies] = useState('');
   const [breed, setBreed] = useState('');
   const [status, setStatus] = useState<PetStatus | ''>('');
   const [page, setPage] = useState(1);
   const [retryCount, setRetryCount] = useState(0);
 
-  const { pets, totalPages, isLoading, isFetching, error, refetch } = usePets({
+  const {
+    pets,
+    totalPages,
+    isLoading,
+    isFetching,
+    isWakingUp,
+    error,
+    refetch,
+  } = usePets({
     limit: LIMIT,
     page,
     species: species || undefined,
@@ -69,7 +143,7 @@ export default function PetListing() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50/60 to-white mb-5">
       <div className="container mx-auto px-4 max-w-7xl py-12 md:py-15 md:pb-0">
-        {/* ── Page header ─────────────────────────────────────────────────── */}
+        {/* ── Page header ───────────────────────────────────────────────── */}
         <div className="mb-10">
           <p className="text-amber-600 font-bold text-sm uppercase tracking-widest mb-2">
             Adopt a Pet
@@ -82,19 +156,13 @@ export default function PetListing() {
           </p>
         </div>
 
-        {/* ── Filter panel ──────────────────────────────────────────────────── */}
+        {/* ── Filter panel ──────────────────────────────────────────────── */}
         <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-3 shadow-sm space-y-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-700">Filters</h2>
-            {/* {activeFilters > 0 && (
-              <button
-                onClick={clearAll}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-500 hover:text-red-500 hover:border-red-200 transition-colors"
-              >
-                <X className="w-3.5 h-3.5" /> Clear All
-              </button>
-            )} */}
           </div>
+
+          {/* Active filter chips */}
           {activeFilters > 0 && (
             <div className="flex flex-wrap gap-2 mb-6">
               {species && (
@@ -144,6 +212,7 @@ export default function PetListing() {
               )}
             </div>
           )}
+
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
@@ -201,7 +270,18 @@ export default function PetListing() {
           </div>
         </div>
       </div>
-      {error && (
+
+      {/* ── NeonDB waking-up banner ─────────────────────────────────────────
+          Shown instead of the skeleton grid while the cold-start retry is
+          in flight. The filter panel above stays visible so the user knows
+          they're in the right place. Once the retry resolves (success or
+          failure) isWakingUp flips back to false and we fall through to
+          the normal loading / error / grid states below.
+      ──────────────────────────────────────────────────────────────────── */}
+      {isWakingUp && <WakingUpBanner />}
+
+      {/* ── Error state (only shown AFTER the retry has already failed) ──── */}
+      {!isWakingUp && error && (
         <ErrorBoundaryUI
           error={error}
           onRetry={() => {
@@ -215,131 +295,129 @@ export default function PetListing() {
         />
       )}
 
-      {/* ── Grid ─────────────────────────────────────────────────────────── */}
-      {isLoading ? (
-         <div className="container mx-auto max-w-7xl py-8 pt-0">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 p-5">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm animate-pulse"
-            >
-              <div className="h-48 bg-amber-50" />
-              <div className="p-4 space-y-2">
-                <div className="h-5 w-3/4 bg-gray-100 rounded-lg" />
-                <div className="h-4 w-1/2 bg-gray-100 rounded-lg" />
-                <div className="h-4 w-1/3 bg-gray-100 rounded-lg" />
+      {/* ── Skeleton grid (first load, not a cold-start) ─────────────────── */}
+      {!isWakingUp && !error && isLoading && (
+        <div className="container mx-auto max-w-7xl py-8 pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 p-5">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm animate-pulse"
+              >
+                <div className="h-48 bg-amber-50" />
+                <div className="p-4 space-y-2">
+                  <div className="h-5 w-3/4 bg-gray-100 rounded-lg" />
+                  <div className="h-4 w-1/2 bg-gray-100 rounded-lg" />
+                  <div className="h-4 w-1/3 bg-gray-100 rounded-lg" />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-        </div>
-      ) : (
-        !error && (
-          <div className="container mx-auto max-w-7xl py-8 pt-0">
-            {/* Thin refetch indicator */}
-            <div
-              className={`absolute -top-3 left-0 right-0 h-0.5 rounded-full bg-amber-400 origin-left transition-all duration-300 ${isFetching ? 'opacity-100 animate-pulse' : 'opacity-0'}`}
-            />
-            {isFetching && (
-              <div className="absolute inset-0 rounded-2xl bg-white/40 z-10 pointer-events-none" />
-            )}
+      )}
 
-            {pets.length === 0 ? (
-              <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-amber-200">
-                <p className="text-5xl mb-4">🐾</p>
-                <p className="text-gray-500 text-lg mb-2">
-                  No pets match your filters.
-                </p>
-                <button
-                  onClick={clearAll}
-                  className="text-amber-600 font-semibold hover:underline text-sm"
-                >
-                  Clear all filters
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 p-5">
-                {pets.map((pet) => {
-                  const badge = STATUS_BADGE[pet.status];
-                  return (
-                    <Link key={pet.id} href={`/pets/${pet.id}`}>
-                      <div className="group bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-lg hover:border-amber-200 transition-all duration-200 cursor-pointer h-full flex flex-col">
-                        {/* Image */}
-                        <div className="relative h-48 bg-amber-50 overflow-hidden flex-shrink-0">
-                          {pet.imageUrl ? (
-                            <img
-                              src={pet.imageUrl}
-                              alt={pet.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-5xl">
-                              🐾
-                            </div>
-                          )}
-                          {/* Status pill */}
+      {/* ── Pet grid ─────────────────────────────────────────────────────── */}
+      {!isWakingUp && !error && !isLoading && (
+        <div className="container mx-auto max-w-7xl py-8 pt-0">
+          {/* Thin refetch progress bar */}
+          <div
+            className={`absolute -top-3 left-0 right-0 h-0.5 rounded-full bg-amber-400 origin-left transition-all duration-300 ${isFetching ? 'opacity-100 animate-pulse' : 'opacity-0'}`}
+          />
+          {isFetching && (
+            <div className="absolute inset-0 rounded-2xl bg-white/40 z-10 pointer-events-none" />
+          )}
+
+          {pets.length === 0 ? (
+            <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-amber-200">
+              <p className="text-5xl mb-4">🐾</p>
+              <p className="text-gray-500 text-lg mb-2">
+                No pets match your filters.
+              </p>
+              <button
+                onClick={clearAll}
+                className="text-amber-600 font-semibold hover:underline text-sm"
+              >
+                Clear all filters
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 p-5">
+              {pets.map((pet) => {
+                const badge = STATUS_BADGE[pet.status];
+                return (
+                  <Link key={pet.id} href={`/pets/${pet.id}`}>
+                    <div className="group bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-lg hover:border-amber-200 transition-all duration-200 cursor-pointer h-full flex flex-col">
+                      <div className="relative h-48 bg-amber-50 overflow-hidden flex-shrink-0">
+                        {pet.imageUrl ? (
+                          <img
+                            src={pet.imageUrl}
+                            alt={pet.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-5xl">
+                            🐾
+                          </div>
+                        )}
+                        <span
+                          className={`absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${badge.bg}`}
+                        >
                           <span
-                            className={`absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${badge.bg}`}
-                          >
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${badge.dot}`}
-                            />
-                            {badge.label}
+                            className={`w-1.5 h-1.5 rounded-full ${badge.dot}`}
+                          />
+                          {badge.label}
+                        </span>
+                      </div>
+                      <div className="p-4 flex flex-col flex-1 gap-2">
+                        <div>
+                          <h3 className="font-bold text-gray-900 group-hover:text-amber-600 transition-colors">
+                            {pet.name}
+                          </h3>
+                          <p className="text-sm text-gray-500 capitalize">
+                            {pet.breed || pet.species}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>
+                            {pet.age != null
+                              ? `${Math.floor(pet.age / 12)}yr ${pet.age % 12}m`
+                              : 'Age unknown'}
+                          </span>
+                          <span className="capitalize">
+                            {pet.gender ?? '—'}
                           </span>
                         </div>
-                        {/* Info */}
-                        <div className="p-4 flex flex-col flex-1 gap-2">
-                          <div>
-                            <h3 className="font-bold text-gray-900 group-hover:text-amber-600 transition-colors">
-                              {pet.name}
-                            </h3>
-                            <p className="text-sm text-gray-500 capitalize">
-                              {pet.breed || pet.species}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-gray-500">
-                            <span>
-                              {pet.age != null
-                                ? `${Math.floor(pet.age / 12)}yr ${pet.age % 12}m`
-                                : 'Age unknown'}
+                        {pet.description && (
+                          <p className="text-xs text-gray-400 line-clamp-2 flex-1">
+                            {pet.description}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50">
+                          {pet.adoptionFee ? (
+                            <span className="text-sm font-bold text-amber-600">
+                              ${pet.adoptionFee}
                             </span>
-                            <span className="capitalize">
-                              {pet.gender ?? '—'}
+                          ) : (
+                            <span className="text-xs text-gray-400">
+                              No fee listed
                             </span>
-                          </div>
-                          {pet.description && (
-                            <p className="text-xs text-gray-400 line-clamp-2 flex-1">
-                              {pet.description}
-                            </p>
                           )}
-                          <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50">
-                            {pet.adoptionFee ? (
-                              <span className="text-sm font-bold text-amber-600">
-                                ${pet.adoptionFee}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-gray-400">
-                                No fee listed
-                              </span>
-                            )}
-                            <span className="text-xs font-semibold text-amber-600 group-hover:underline">
-                              View →
-                            </span>
-                          </div>
+                          <span className="text-xs font-semibold text-amber-600 group-hover:underline">
+                            View →
+                          </span>
                         </div>
                       </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── Pagination ───────────────────────────────────────────────────── */}
-      {!isLoading && totalPages > 1 && pets.length > 0 && (
+      {!isLoading && !isWakingUp && totalPages > 1 && pets.length > 0 && (
         <div className="flex items-center justify-center gap-2 mt-12 flex-wrap">
           <button
             onClick={() => setPage((p) => p - 1)}
