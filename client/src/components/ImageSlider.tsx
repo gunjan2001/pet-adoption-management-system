@@ -4,9 +4,7 @@ import type { Swiper as SwiperType } from "swiper";
 import { A11y, Keyboard, Navigation, Pagination, Thumbs } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 
-// Core styles — always required
 import "swiper/css";
-// Module styles
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import "swiper/css/thumbs";
@@ -47,67 +45,73 @@ export default function ImageSlider({ images, alt }: ImageSliderProps) {
 
       {/* ── Main slider ─────────────────────────────────────────────────── */}
       <div className="image-slider-main rounded-3xl overflow-hidden">
-        <Swiper
-          modules={[Navigation, Pagination, Thumbs, Keyboard, A11y]}
-          // Touch / swipe — Swiper handles this natively out of the box
-          touchStartPreventDefault={false}   // don't block native scroll intent
-          touchReleaseOnEdges               // hand back scroll at the first/last slide
-          // Navigation arrows
-          navigation={{
-            prevEl: ".swiper-btn-prev",
-            nextEl: ".swiper-btn-next",
-          }}
-          // Dot pagination
-          pagination={{ clickable: true, dynamicBullets: true }}
-          // Thumbnail sync
-          thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }}
-          // Keyboard arrow-key support
-          keyboard={{ enabled: true, onlyInViewport: true }}
-          // Accessibility
-          a11y={{ prevSlideMessage: "Previous image", nextSlideMessage: "Next image" }}
-          loop={images.length > 1}
-          className="relative aspect-square w-full bg-gray-50"
-        >
-          {images.map((image, i) => (
-            <SwiperSlide key={image.id}>
-              <img
-                src={image.url ?? ""}
-                alt={`${alt} — image ${i + 1}`}
-                draggable={false}
-                className="w-full h-full object-cover"
-              />
-            </SwiperSlide>
-          ))}
 
-          {/* Custom nav buttons — styled to match project design system */}
-          <button
-            className="swiper-btn-prev absolute left-3 top-1/2 -translate-y-1/2 z-10
-                       w-10 h-10 rounded-full bg-white/90 hover:bg-white
-                       flex items-center justify-center shadow-lg
-                       transition-all hover:scale-105 active:scale-95
-                       disabled:opacity-30 disabled:cursor-not-allowed"
-            aria-label="Previous image"
-          >
-            {/* Chevron left */}
-            <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-            </svg>
-          </button>
+        {/*
+          KEY FIX: The aspect-ratio must live on a plain <div>, NOT on the
+          <Swiper> component. Swiper renders its own wrapper divs internally
+          and doesn't propagate className-based aspect-ratio to them, which
+          caused the slide to expand to full viewport height on mobile.
 
-          <button
-            className="swiper-btn-next absolute right-3 top-1/2 -translate-y-1/2 z-10
-                       w-10 h-10 rounded-full bg-white/90 hover:bg-white
-                       flex items-center justify-center shadow-lg
-                       transition-all hover:scale-105 active:scale-95
-                       disabled:opacity-30 disabled:cursor-not-allowed"
-            aria-label="Next image"
-          >
-            {/* Chevron right */}
-            <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-            </svg>
-          </button>
-        </Swiper>
+          The outer div establishes a square box via padding-bottom trick
+          (100% = width). The inner absolute div fills it completely.
+          Swiper + its slides are forced to 100% width/height via CSS below.
+        */}
+        <div className="relative w-full" style={{ paddingBottom: "100%" }}>
+          <div className="absolute inset-0">
+            <Swiper
+              modules={[Navigation, Pagination, Thumbs, Keyboard, A11y]}
+              touchStartPreventDefault={false}
+              touchReleaseOnEdges
+              navigation={{
+                prevEl: ".swiper-btn-prev",
+                nextEl: ".swiper-btn-next",
+              }}
+              pagination={{ clickable: true, dynamicBullets: true }}
+              thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }}
+              keyboard={{ enabled: true, onlyInViewport: true }}
+              a11y={{ prevSlideMessage: "Previous image", nextSlideMessage: "Next image" }}
+              loop={images.length > 1}
+              className="image-slider-swiper w-full h-full bg-gray-50"
+            >
+              {images.map((image, i) => (
+                <SwiperSlide key={image.id} className="image-slider-slide">
+                  <img
+                    src={image.url ?? ""}
+                    alt={`${alt} — image ${i + 1}`}
+                    draggable={false}
+                    className="w-full h-full object-cover"
+                  />
+                </SwiperSlide>
+              ))}
+
+              {/* Prev button */}
+              <button
+                className="swiper-btn-prev absolute left-3 top-1/2 -translate-y-1/2 z-10
+                           w-10 h-10 rounded-full bg-white/90 hover:bg-white
+                           flex items-center justify-center shadow-lg
+                           transition-all hover:scale-105 active:scale-95"
+                aria-label="Previous image"
+              >
+                <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                </svg>
+              </button>
+
+              {/* Next button */}
+              <button
+                className="swiper-btn-next absolute right-3 top-1/2 -translate-y-1/2 z-10
+                           w-10 h-10 rounded-full bg-white/90 hover:bg-white
+                           flex items-center justify-center shadow-lg
+                           transition-all hover:scale-105 active:scale-95"
+                aria-label="Next image"
+              >
+                <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+              </button>
+            </Swiper>
+          </div>
+        </div>
       </div>
 
       {/* ── Thumbnail strip ──────────────────────────────────────────────── */}
@@ -117,7 +121,7 @@ export default function ImageSlider({ images, alt }: ImageSliderProps) {
           onSwiper={setThumbsSwiper}
           slidesPerView="auto"
           spaceBetween={8}
-          watchSlidesProgress          // required for thumbs module
+          watchSlidesProgress
           className="!pb-1"
         >
           {images.map((image, i) => (
@@ -137,7 +141,16 @@ export default function ImageSlider({ images, alt }: ImageSliderProps) {
 
       {/* ── Scoped styles ────────────────────────────────────────────────── */}
       <style>{`
-        /* Amber dot pagination to match design system */
+        /* Force Swiper's internal wrapper divs to fill the container.
+           Without this, .swiper-wrapper and .swiper-slide default to
+           auto height and blow past the aspect-ratio box on mobile. */
+        .image-slider-swiper,
+        .image-slider-swiper .swiper-wrapper,
+        .image-slider-slide {
+          height: 100% !important;
+        }
+
+        /* Amber pill-shaped active dot */
         .image-slider-main .swiper-pagination-bullet {
           background: #D1D5DB;
           opacity: 1;

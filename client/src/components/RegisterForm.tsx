@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
-import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getErrorMessage, getFieldErrors } from "@/lib/errorHandler";
+import { Eye, EyeOff } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { useLocation } from "wouter";
+import { GoogleSignInButton } from "./GoogleButton";
 
 export default function RegisterForm() {
   const { register, isAuthenticated, user } = useAuth();
   const [, navigate] = useLocation();
+  const [googleError, setGoogleError] = useState("");
 
   const [form, setForm] = useState({ 
     name: "", 
@@ -17,6 +20,7 @@ export default function RegisterForm() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -138,57 +142,97 @@ export default function RegisterForm() {
     }
   };
 
-  const field = (
-    name: keyof typeof form,
-    label: string,
-    type = "text",
-    placeholder = ""
-  ) => (
+const field = (
+  name: keyof typeof form,
+  label: string,
+  type = "text",
+  placeholder = ""
+) => {
+  const isPassword = type === "password";
+
+  return (
     <div className="space-y-1.5">
-      <label 
-        htmlFor={name} 
-        className="text-sm font-medium text-gray-700"
-      >
+      <label htmlFor={name} className="text-sm font-medium text-gray-700">
         {label}
       </label>
-      <input
-        id={name}
-        name={name}
-        type={type}
-        value={form[name]}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        placeholder={placeholder}
-        autoComplete="off"
-        className={`w-full px-4 py-2 border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 transition-all ${
-          errors[name] 
-            ? "border-red-300 focus:ring-red-400" 
-            : "border-gray-200 focus:ring-amber-400"
-        }`}
-      />
+      <div className={isPassword ? "relative" : undefined}>
+        <input
+          id={name}
+          name={name}
+          type={isPassword ? (showPassword ? "text" : "password") : type}
+          value={form[name]}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          placeholder={placeholder}
+          autoComplete="off"
+          className={`w-full px-4 py-2 border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 transition-all ${
+            isPassword ? "pr-11" : ""
+          } ${
+            errors[name]
+              ? "border-red-300 focus:ring-red-400"
+              : "border-gray-200 focus:ring-amber-400"
+          }`}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? (
+              <EyeOff className="w-4 h-4" />
+            ) : (
+              <Eye className="w-4 h-4" />
+            )}
+          </button>
+        )}
+      </div>
       {errors[name] && (
         <p className="text-xs text-red-500 mt-1">{errors[name]}</p>
       )}
     </div>
   );
+};
 
   return (
     <div>
       <form onSubmit={handleSubmit} className="space-y-2">
-        {field("name", "Full name *", "text", "Jane Doe")}
-        {field("email", "Email *", "text", "you@example.com")}
-        {field("password", "Password *", "password", "Min 8 chars, 1 uppercase, 1 number")}
-        {field("phone", "Phone", "tel", "+1 555 000 0000")}
-        {field("address", "Address", "text", "123 Main St")}
+        {field('name', 'Full name *', 'text', 'Jane Doe')}
+        {field('email', 'Email *', 'text', 'you@example.com')}
+        {field(
+          'password',
+          'Password *',
+          'password',
+          'Min 8 chars, 1 uppercase, 1 number'
+        )}
+        {field('phone', 'Phone', 'tel', '+1 555 000 0000')}
+        {field('address', 'Address', 'text', '123 Main St')}
 
         <button
           type="submit"
           className="w-full px-7 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={loading}
         >
-          {loading ? "Creating account…" : "Create account"}
+          {loading ? 'Creating account…' : 'Create account'}
         </button>
       </form>
+      {/* ── Divider ── */}
+      <div className="flex items-center gap-3 my-4">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-xs text-gray-400 font-medium">or</span>
+        <div className="flex-1 h-px bg-gray-200" />
+      </div>
+
+      {/* ── Google button ── */}
+      <GoogleSignInButton
+        onSuccess={() => navigate('/pets')}
+        onError={(msg) => setGoogleError(msg)}
+      />
+
+      {googleError && (
+        <p className="text-xs text-red-500 text-center mt-1">{googleError}</p>
+      )}
     </div>
   );
 }

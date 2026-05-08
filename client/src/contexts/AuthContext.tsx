@@ -22,6 +22,7 @@ interface AuthContextValue {
   register:        (data: RegisterInput) => Promise<void>;
   logout:          () => void;
   refreshUser:     () => Promise<void>;
+  googleLogin:     (credential: string) => Promise<void>;
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -83,6 +84,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     [persistAuth]
   );
 
+  const googleLogin = async (credential: string): Promise<void> => {
+    const { token, user } = await authApi.googleAuth(credential);
+    persistAuth(token, user);
+  };
+
   const logout = useCallback(() => {
     clearAuth();
   }, [clearAuth]);
@@ -109,8 +115,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       register,
       logout,
       refreshUser,
+      googleLogin,
     }),
-    [user, token, isLoading, login, register, logout, refreshUser]
+    [user, token, isLoading, login, register, logout, refreshUser, googleLogin]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
