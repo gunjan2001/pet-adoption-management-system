@@ -1,20 +1,23 @@
 // src/routes/auth.routes.ts
 import { Router } from "express";
-import { authenticate }          from "../middleware/auth";     // ← no .js
-import { validateBody }          from "../middleware/validate"; // ← no .js
 import {
-  registerSchema,
-  loginSchema,
-  updateProfileSchema,
-} from "../validators/schemas"; // ← no .js
-import {
-  register,
-  login,
   getProfile,
+  login,
+  register,
   updateProfile,
 } from "../controllers/auth.controller"; // ← no .js
+import { googleAuth } from "../controllers/google.auth.controller";
+import { authenticate } from "../middleware/auth"; // ← no .js
+import { validateBody } from "../middleware/validate"; // ← no .js
+import {
+  loginSchema,
+  registerSchema,
+  updateProfileSchema,
+} from "../validators/schemas"; // ← no .js
 
 const router = Router();
+
+router.post("/google", googleAuth);
 
 // POST /api/auth/register
 router.post("/register", validateBody(registerSchema), register);

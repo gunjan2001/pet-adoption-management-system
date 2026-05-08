@@ -1,3 +1,4 @@
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Toaster } from 'sonner';
 import { Redirect, Route, Switch } from 'wouter';
 import { useAuth } from './_core/hooks/useAuth';
@@ -107,6 +108,7 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
         <ThemeProvider defaultTheme="light">
           <>
             <Toaster />
@@ -119,6 +121,7 @@ function App() {
             </div>
           </>
         </ThemeProvider>
+      </GoogleOAuthProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

@@ -25,6 +25,11 @@ export const authApi = {
     }
   },
 
+  googleAuth: async (credential: string): Promise<AuthResponse> => {
+    const { data } = await api.post<AuthResponse>("/auth/google", { credential });
+    return data;
+  },
+
   /** Get the currently logged-in user's profile */
   getProfile: async (): Promise<User> => {
     try {

@@ -4,6 +4,7 @@ import { Request, Response } from "express";
 import db from "../config/db.js";
 import { adoptionApplications, media, petMedia, pets, users } from "../db/schema.js";
 import { generateImageUrl } from "../helpers/generateImageUrl.js";
+import { sendApplicationStatusEmail } from "../services/email.service.js";
 import type { AuthRequest } from "../types";
 import {
   CreateApplicationInput,
@@ -352,6 +353,26 @@ export const reviewApplication = async (
             eq(adoptionApplications.status, "pending")
           )
         );
+    }
+
+    // ── Send status email ─────────────────────────────────────────────────
+    // Fetch pet + applicant in parallel — only needed for the email so we
+    // do it AFTER the DB updates and AFTER the response is sent.
+    // Both queries are fire-and-forget; a failure here never affects the
+    // API response the admin already received.
+    const [pet, applicant] = await Promise.all([
+      db.select().from(pets).where(eq(pets.id, app.petId)).limit(1),
+      db.select().from(users).where(eq(users.id, app.userId)).limit(1),
+    ]);
+
+    if (applicant[0]?.email) {
+      sendApplicationStatusEmail({
+        to:            applicant[0].email,
+        applicantName: applicant[0].name ?? applicant[0].email.split("@")[0],
+        petName:       pet[0]?.name ?? "your pet",
+        petSpecies:    pet[0]?.species ?? "pet",
+        status,
+      }); // intentionally NOT awaited — email never blocks the response
     }
 
     res.status(200).json({
