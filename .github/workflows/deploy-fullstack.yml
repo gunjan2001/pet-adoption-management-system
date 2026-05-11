@@ -61,14 +61,24 @@ jobs:
           sleep 60
 
   # ── Job 2: Deploy Frontend ──────────────────────────────────────────────────
-  # Runs independently when deploy_frontend is true.
-  # When BOTH are selected, it waits for the backend first (needs is conditional).
-  # When ONLY frontend is selected, it runs immediately without waiting.
+  #
+  # THE FIX: `always()` must wrap the entire if condition at the JOB level.
+  #
+  # GitHub Actions behaviour:
+  #   - If a job in `needs` is SKIPPED, all dependent jobs are also auto-skipped
+  #     UNLESS the job's `if` condition explicitly starts with `always()`.
+  #   - `always()` tells GitHub: "evaluate my `if` regardless of needs status".
+  #   - Without it, selecting frontend-only skips this job because deploy-backend
+  #     was skipped, even if inputs.deploy_frontend is true.
+  #
+  # Scenarios:
+  #   Backend + Frontend → backend runs first, frontend waits via `needs`
+  #   Backend only       → deploy-frontend if=false, job skipped cleanly
+  #   Frontend only      → deploy-backend skipped, but always() lets this run
+  #
   deploy-frontend:
     name: Deploy Frontend to Vercel
-    if: ${{ inputs.deploy_frontend }}
-    # Only depend on backend job when both are selected.
-    # `always()` ensures this job still runs even if deploy-backend was skipped.
+    if: ${{ always() && inputs.deploy_frontend }}
     needs: [deploy-backend]
     runs-on: ubuntu-latest
 
@@ -114,8 +124,6 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   # ── Job 3: Smoke Test ───────────────────────────────────────────────────────
-  # Runs after whichever jobs were selected.
-  # `always()` keeps it from being skipped when one of the deploy jobs is skipped.
   smoke-test:
     name: Smoke Test
     needs: [deploy-backend, deploy-frontend]
@@ -153,8 +161,6 @@ jobs:
             echo "🌐 Frontend: ⏭️  Skipped"
           fi
           echo "⏰ Time:     $(date)"
-          echo ""
-          echo "🔗 Your app is live!"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   # ── Job 4: Create GitHub Release ────────────────────────────────────────────
@@ -180,9 +186,6 @@ jobs:
 
             **Backend:** ${{ inputs.deploy_backend && 'Deployed to Render' || 'Skipped' }}
             **Frontend:** ${{ inputs.deploy_frontend && 'Deployed to Vercel' || 'Skipped' }}
-
-            ### What's Changed
-            - See commit history for details
 
             **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ github.ref }}
           draft: false
