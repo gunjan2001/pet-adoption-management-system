@@ -1,28 +1,26 @@
 name: Deploy Full Stack
 
-# This workflow deploys both backend and frontend together
-# Useful for releases that touch both parts of the application
-
 on:
-  workflow_dispatch: # Manual trigger only
+  workflow_dispatch:
     inputs:
       deploy_backend:
-        description: 'Deploy backend to Render'
+        description: '🚀 Deploy backend to Render'
         required: true
         type: boolean
         default: true
       deploy_frontend:
-        description: 'Deploy frontend to Vercel'
+        description: '🌐 Deploy frontend to Vercel'
         required: true
         type: boolean
         default: true
 
 jobs:
-  # Job 1: Deploy Backend
+  # ── Job 1: Deploy Backend ───────────────────────────────────────────────────
   deploy-backend:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.deploy_backend }}
+    name: Deploy Backend to Render
+    if: ${{ inputs.deploy_backend }}
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -54,7 +52,6 @@ jobs:
             -H "Accept: application/json" \
             -H "Authorization: Bearer $RENDER_API_KEY" \
             "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys")
-          
           echo "Response: $response"
           echo "✅ Backend deployment triggered!"
 
@@ -63,54 +60,16 @@ jobs:
           echo "⏳ Waiting for backend to deploy (60 seconds)..."
           sleep 60
 
-  # Job 2: Deploy Frontend (depends on backend only when backend is requested)
-  # # deploy-frontend:
-  #   if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.deploy_frontend) }}
-  #   needs: deploy-backend
-  #   runs-on: ubuntu-latest
-    
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: '20'
-  #         cache: 'npm'
-  #         cache-dependency-path: 'client/package-lock.json'
-
-  #     - name: Install frontend dependencies
-  #       run: |
-  #         cd client
-  #         npm ci
-
-  #     - name: Install Vercel CLI
-  #       run: npm install -g vercel@latest
-
-  #     - name: Build frontend
-  #       run: |
-  #         cd client
-  #         npm run build
-  #       env:
-  #         VITE_API_URL: ${{ secrets.VITE_API_URL }}
-
-  #     - name: Deploy to Vercel
-  #       id: deploy
-  #       run: |
-  #         cd client
-  #         URL=$(vercel deploy --prod --confirm --token="$VERCEL_TOKEN" --local-config ../vercel.json --env VITE_API_URL="$VITE_API_URL")
-  #         echo "url=$URL" >> $GITHUB_OUTPUT
-  #         echo "✅ Frontend deployed to: $URL"
-  #       env:
-  #         VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-  #         VITE_API_URL: ${{ secrets.VITE_API_URL }}
-
-  #     - name: Wait for deployment to be ready
-  #       run: sleep 15
+  # ── Job 2: Deploy Frontend ──────────────────────────────────────────────────
+  # Runs independently when deploy_frontend is true.
+  # When BOTH are selected, it waits for the backend first (needs is conditional).
+  # When ONLY frontend is selected, it runs immediately without waiting.
   deploy-frontend:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.deploy_frontend }}
-    needs: deploy-backend
+    name: Deploy Frontend to Vercel
+    if: ${{ inputs.deploy_frontend }}
+    # Only depend on backend job when both are selected.
+    # `always()` ensures this job still runs even if deploy-backend was skipped.
+    needs: [deploy-backend]
     runs-on: ubuntu-latest
 
     steps:
@@ -132,7 +91,6 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
 
-      # 🔗 VERY IMPORTANT: Link to existing Vercel project
       - name: Pull Vercel Project Settings
         run: |
           cd client
@@ -140,7 +98,6 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
-      # ⚡ Build using Vercel (recommended)
       - name: Build Project
         run: |
           cd client
@@ -149,7 +106,6 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
-      # 🚀 Deploy
       - name: Deploy to Vercel
         run: |
           cd client
@@ -157,24 +113,23 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
-  # Job 3: Run smoke tests (optional)
+  # ── Job 3: Smoke Test ───────────────────────────────────────────────────────
+  # Runs after whichever jobs were selected.
+  # `always()` keeps it from being skipped when one of the deploy jobs is skipped.
   smoke-test:
+    name: Smoke Test
     needs: [deploy-backend, deploy-frontend]
+    if: ${{ always() && (inputs.deploy_backend || inputs.deploy_frontend) }}
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Test backend health
+        if: ${{ inputs.deploy_backend }}
         run: |
           BACKEND_URL="${{ secrets.VITE_API_URL }}"
-          
           echo "🔍 Testing backend at: $BACKEND_URL"
-          
-          # Wait for backend to wake up
           sleep 30
-          
-          # Test auth endpoint
           response=$(curl -s -o /dev/null -w "%{http_code}" $BACKEND_URL/api/auth/me || echo "000")
-          
           if [ "$response" = "401" ] || [ "$response" = "200" ]; then
             echo "✅ Backend API is responding correctly (HTTP $response)"
           else
@@ -184,22 +139,31 @@ jobs:
       - name: Deployment summary
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "🎉 DEPLOYMENT SUCCESSFUL!"
+          echo "🎉 DEPLOYMENT COMPLETE!"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
-          echo "📦 Backend:  Deployed to Render"
-          echo "🌐 Frontend: Deployed to Vercel"
+          if [ "${{ inputs.deploy_backend }}" = "true" ]; then
+            echo "📦 Backend:  ✅ Deployed to Render"
+          else
+            echo "📦 Backend:  ⏭️  Skipped"
+          fi
+          if [ "${{ inputs.deploy_frontend }}" = "true" ]; then
+            echo "🌐 Frontend: ✅ Deployed to Vercel"
+          else
+            echo "🌐 Frontend: ⏭️  Skipped"
+          fi
           echo "⏰ Time:     $(date)"
           echo ""
           echo "🔗 Your app is live!"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-  # Job 4: Create GitHub Release (for version tags)
+  # ── Job 4: Create GitHub Release ────────────────────────────────────────────
   create-release:
+    name: Create GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [deploy-backend, deploy-frontend, smoke-test]
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -213,13 +177,13 @@ jobs:
           release_name: Release ${{ github.ref }}
           body: |
             ## 🚀 Deployment Complete
-            
-            **Backend:** Deployed to Render
-            **Frontend:** Deployed to Vercel
-            
+
+            **Backend:** ${{ inputs.deploy_backend && 'Deployed to Render' || 'Skipped' }}
+            **Frontend:** ${{ inputs.deploy_frontend && 'Deployed to Vercel' || 'Skipped' }}
+
             ### What's Changed
             - See commit history for details
-            
+
             **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ github.ref }}
           draft: false
           prerelease: false
