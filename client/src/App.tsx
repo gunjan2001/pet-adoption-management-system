@@ -103,6 +103,9 @@ function Router() {
   );
 }
 
+console.log("client id",import.meta.env.VITE_GOOGLE_CLIENT_ID);
+
+
 // ── App ───────────────────────────────────────────────────────────────────────
 function App() {
   return (
