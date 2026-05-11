@@ -103,7 +103,7 @@ function Router() {
   );
 }
 
-console.log("client id",import.meta.env.VITE_GOOGLE_CLIENT_ID);
+console.log("client id",import.meta.env.VITE_AUTH_CLIENT_ID);
 
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_AUTH_CLIENT_ID}>
         <ThemeProvider defaultTheme="light">
           <>
             <Toaster />
