@@ -84,8 +84,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     [persistAuth]
   );
 
-  const googleLogin = async (credential: string): Promise<void> => {
-    const { token, user } = await authApi.googleAuth(credential);
+  // const googleLogin = async (credential: string): Promise<void> => {
+  //   const { token, user } = await authApi.googleAuth(credential);
+  //   persistAuth(token, user);
+  // };
+
+  const googleLogin = async (accessToken: string): Promise<void> => {
+    const { token, user } = await authApi.googleAuth(accessToken);
     persistAuth(token, user);
   };
 
