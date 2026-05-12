@@ -103,9 +103,7 @@ function Router() {
   );
 }
 
-const clientId =
-import.meta.env.VITE_GOOGLE_CLIENT_ID ??
-'541757306-jf97v2ccvk4h06mua7imto85nfrhschj.apps.googleusercontent.com';
+const clientId = '541757306-jf97v2ccvk4h06mua7imto85nfrhschj.apps.googleusercontent.com';
 
 // ── App ───────────────────────────────────────────────────────────────────────
 function App() {
