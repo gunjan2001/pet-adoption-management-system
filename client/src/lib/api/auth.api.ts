@@ -25,8 +25,15 @@ export const authApi = {
     }
   },
 
-  googleAuth: async (credential: string): Promise<AuthResponse> => {
-    const { data } = await api.post<AuthResponse>("/auth/google", { credential });
+  // googleAuth: async (credential: string): Promise<AuthResponse> => {
+  //   const { data } = await api.post<AuthResponse>("/auth/google", { credential });
+  //   return data;
+  // },
+
+  googleAuth: async (accessToken: string): Promise<AuthResponse> => {
+    const { data } = await api.post<AuthResponse>("/auth/google", {
+      access_token: accessToken,   // ← changed from credential
+    });
     return data;
   },
 

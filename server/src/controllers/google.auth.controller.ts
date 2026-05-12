@@ -14,28 +14,96 @@ const signToken = (userId: number, role: "user" | "admin"): string =>
   expiresIn: (process.env.JWT_EXPIRES_IN ?? "7d") as SignOptions["expiresIn"],
 });
 
-export async function googleAuth(req: Request, res: Response) {
-  const { credential } = req.body;
+// export async function googleAuth(req: Request, res: Response) {
+//   const { credential } = req.body;
 
-  if (!credential) {
-    return res.status(400).json({ success: false, message: "Google credential is required" });
+//   if (!credential) {
+//     return res.status(400).json({ success: false, message: "Google credential is required" });
+//   }
+
+//   // ── 1. Verify the ID token with Google ──────────────────────────────────
+//   let payload: { email?: string; name?: string; sub?: string; picture?: string };
+//   try {
+//     const ticket = await client.verifyIdToken({
+//       idToken: credential,
+//       audience: process.env.GOOGLE_CLIENT_ID,
+//     });
+//     payload = ticket.getPayload() ?? {};
+//   } catch {
+//     return res.status(401).json({ success: false, message: "Invalid Google token" });
+//   }
+
+//   const { email, name, sub: googleId } = payload;
+
+//   if (!email || !googleId) {
+//     return res.status(400).json({ success: false, message: "Could not retrieve email from Google" });
+//   }
+
+//   // ── 2. Find existing user or create a new one ───────────────────────────
+//   let [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+//   if (user) {
+//     // User exists — update lastSignedIn and ensure loginMethod reflects Google
+//     await db
+//       .update(users)
+//       .set({ lastSignedIn: new Date(), loginMethod: "google" })
+//       .where(eq(users.id, user.id));
+//   } else {
+//     // New user — create account, no password needed
+//     [user] = await db
+//       .insert(users)
+//       .values({
+//         email,
+//         name: name ?? email.split("@")[0],
+//         password: "",          // empty — Google users never use password login
+//         role: "user",
+//         loginMethod: "google",
+//         lastSignedIn: new Date(),
+//       })
+//       .returning();
+//   }
+
+//   // ── 3. Sign JWT — identical to regular login ────────────────────────────
+//   const token = signToken(user.id, user.role);
+
+//   // ── 4. Return same shape as /auth/login so frontend reuses persistAuth ──
+//   return res.status(200).json({
+//     success: true,
+//     message: "Google authentication successful",
+//     token,
+//     user: {
+//       id:      user.id,
+//       name:    user.name,
+//       email:   user.email,
+//       role:    user.role,
+//       phone:   user.phone,
+//       address: user.address,
+//     },
+//   });
+// }
+
+export async function googleAuth(req: Request, res: Response) {
+  const { access_token } = req.body;
+
+  if (!access_token) {
+    return res.status(400).json({ success: false, message: "Access token is required" });
   }
 
-  // ── 1. Verify the ID token with Google ──────────────────────────────────
-  let payload: { email?: string; name?: string; sub?: string; picture?: string };
+  // Verify by fetching Google userinfo directly
+  let googleUser: { email?: string; name?: string; sub?: string };
   try {
-    const ticket = await client.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
+    const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${access_token}` },
     });
-    payload = ticket.getPayload() ?? {};
+    if (!response.ok) throw new Error("Invalid token");
+    // @ts-ignore
+    googleUser = await response.json();
   } catch {
     return res.status(401).json({ success: false, message: "Invalid Google token" });
   }
 
-  const { email, name, sub: googleId } = payload;
-
-  if (!email || !googleId) {
+  const { email, name } = googleUser;
+  if (!email) {
     return res.status(400).json({ success: false, message: "Could not retrieve email from Google" });
   }
 
@@ -81,3 +149,5 @@ export async function googleAuth(req: Request, res: Response) {
     },
   });
 }
+
+
