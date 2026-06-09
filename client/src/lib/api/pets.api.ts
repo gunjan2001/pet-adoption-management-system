@@ -16,10 +16,10 @@ export interface PetsListResponse {
 
 export const petsApi = {
   /** Get paginated/filtered list of pets (public) */
-  getAll: async (filters: PetFilters = {}, signal?: AbortSignal): Promise<PetsListResponse> => {
+  getAll: async (filters: PetFilters = {}): Promise<PetsListResponse> => {
     const res = await api.get<ApiSuccess<Pet[]> & { pagination: PaginationMeta }>(
       "/pets",
-      { params: filters, signal }
+      { params: filters }
     );
     return { data: res.data.data ?? [], pagination: res.data.pagination! };
   },

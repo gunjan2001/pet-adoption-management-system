@@ -61,6 +61,8 @@ A full-stack pet adoption platform that connects pets with their forever homes. 
 - **Password Hashing:** bcryptjs
 - **File Upload:** Multer (in-memory)
 - **Image Storage:** Cloudinary
+- **AI Integration:** Google Generative AI (`@google/generative-ai`) — Gemini models for NL search and adoption assistant
+- **Email:** Nodemailer
 - **Development:** tsx (TypeScript execution)
 - **CORS:** Cross-origin resource sharing
 
@@ -85,10 +87,18 @@ pet-adoption-management-system/
 │   │   │   ├── RegisterForm.tsx               # Registration form component
 │   │   │   ├── ImageUploadField.tsx           # Image upload component with Cloudinary
 │   │   │   ├── ImageSlider.tsx                # Multi-image carousel for pets
-│   │   │   ├── AIChatBox.tsx                  # AI chat component
+│   │   │   ├── AIChatBox.tsx                  # Floating AI search — translates NL query to pet filters
+│   │   │   ├── AdoptionAIChat.tsx             # Conversational AI adoption form assistant
+│   │   │   ├── PetGrid.tsx                    # Responsive pet card grid with skeleton loading
+│   │   │   ├── PetPagination.tsx              # Smart pagination with ellipsis pattern
+│   │   │   ├── PetFilterPanel.tsx             # Advanced filter panel with inline AI search
+│   │   │   ├── PetCard.tsx                    # Individual pet card component
 │   │   │   ├── ErrorBoundary.tsx              # Error boundary component
+│   │   │   ├── ErrorBoundaryUI.tsx            # Error boundary fallback UI with retry
+│   │   │   ├── WakingUpBanner.tsx             # NeonDB cold-start notification banner
 │   │   │   ├── DeletePetModal.tsx             # Pet deletion confirmation modal
 │   │   │   ├── WithdrawModal.tsx              # Application withdrawal confirmation
+│   │   │   ├── GoogleButton.tsx               # Google OAuth sign-in button
 │   │   │   ├── Footer.tsx                     # Footer component
 │   │   │   └── ScrollToTop.tsx                # Scroll-to-top utility
 │   │   ├── contexts/
@@ -139,11 +149,14 @@ pet-adoption-management-system/
 │   │   │   ├── auth.controller.ts             # Register, login, profile management
 │   │   │   ├── pet.controller.ts              # Pet CRUD with image handling
 │   │   │   ├── adoption.controller.ts         # Application submission & review
+│   │   │   ├── ai.controller.ts               # AI search + adoption assistant (Gemini)
+│   │   │   ├── google.auth.controller.ts      # Google OAuth controller
 │   │   │   └── media.controller.ts            # Image upload to Cloudinary
 │   │   ├── routes/
 │   │   │   ├── auth.routes.ts                 # /api/auth/* endpoints
 │   │   │   ├── pet.routes.ts                  # /api/pets/* endpoints
 │   │   │   ├── adoption.routes.ts             # /api/adoptions/* endpoints
+│   │   │   ├── ai.routes.ts                   # /api/ai/* endpoints (search, adoption-assist)
 │   │   │   └── upload.route.ts                # /api/media/upload endpoint
 │   │   ├── middleware/
 │   │   │   ├── auth.ts                        # JWT authentication & authorization
@@ -247,57 +260,6 @@ pet-adoption-management-system/
 │   │   │   ├── Navigation.tsx                 # Main + Admin nav with mobile support
 │   │   │   ├── LoginForm.tsx                  # Login form component
 │   │   │   └── RegisterForm.tsx               # Registration form component
-│   │   ├── contexts/
-│   │   │   ├── AuthContext.tsx                # Authentication context & provider
-│   │   │   └── ThemeContext.tsx               # Theme context (if needed)
-│   │   ├── hooks/
-│   │   │   ├── usePets.ts                     # Pet data fetching (isLoading vs isFetching)
-│   │   │   └── useAdoptions.ts                # Adoption application hooks
-│   │   ├── lib/
-│   │   │   ├── httpClient.ts                  # Axios instance with JWT interceptor
-│   │   │   ├── api/
-│   │   │   │   ├── auth.api.ts                # Auth service layer
-│   │   │   │   ├── pets.api.ts                # Pet CRUD operations
-│   │   │   │   └── adoptions.api.ts           # Adoption API calls
-│   │   │   ├── utils.ts                       # cn() helper for Tailwind
-│   │   │   └── errorHandler.ts                # Error message extraction
-│   │   ├── pages/
-│   │   │   ├── Home.tsx                       # Landing page (6 sections)
-│   │   │   ├── PetListing.tsx                 # Browse pets with filters
-│   │   │   ├── PetDetail.tsx                  # Pet details + application form
-│   │   │   ├── UserDashboard.tsx              # User's applications
-│   │   │   ├── AdminDashboard.tsx             # Admin overview with stats
-│   │   │   ├── AdminManagePets.tsx            # Pet CRUD with slide-in panel
-│   │   │   └── AdminApplications.tsx          # Review applications
-│   │   ├── types/
-│   │   │   └── index.ts                       # TypeScript interfaces
-│   │   ├── main.tsx                           # App entry point
-│   │   └── App.tsx                            # Root component with routing
-│   ├── vite.config.ts                         # Vite config with proxy
-│   ├── tsconfig.json
-│   └── package.json
-├── server/                                    # Express REST backend
-│   ├── src/
-│   │   ├── controllers/
-│   │   │   ├── auth.controller.ts             # Auth endpoints
-│   │   │   ├── pet.controller.ts              # Pet CRUD endpoints
-│   │   │   └── adoption.controller.ts         # Adoption endpoints
-│   │   ├── routes/
-│   │   │   ├── auth.routes.ts
-│   │   │   ├── pet.routes.ts
-│   │   │   └── adoption.routes.ts
-│   │   ├── middleware/
-│   │   │   ├── auth.ts                        # authenticate + authorize
-│   │   │   └── validate.ts                    # Zod validation middleware
-│   │   ├── validators/
-│   │   │   └── schemas.ts                     # All Zod schemas
-│   │   ├── config/
-│   │   │   └── db.ts                          # Drizzle + pg.Pool setup
-│   │   ├── db/
-│   │   │   └── schema.ts                      # Database schema (users, pets, applications)
-│   │   ├── types/
-│   │   │   └── index.ts                       # AuthRequest, JwtPayload, etc.
-│   │   └── index.ts                           # Express app entry
 │   ├── seed-pets.js                           # Sample data seeder
 │   ├── migrate.js                             # Migration runner
 │   ├── package.json
@@ -498,8 +460,20 @@ className="bg-gray-100 text-gray-600"
 - 5MB max file size per image
 - Support for JPG, PNG, WebP, and other image formats
 
-⚠️ **Placeholder/Stub Components** (Not Implemented Yet)
-- `AIChatBox.tsx` - Commented out, prepared for future AI features
+✅ **AI-Powered Pet Search (`AIChatBox.tsx`)**
+- Floating "Search with AI" button fixed to bottom-right corner on the Pet Listing page
+- Accepts natural language queries (e.g. "female dog under 2 years")
+- Sends query to `POST /api/ai/search` which uses Gemini to extract structured filters
+- Applies returned filters to the pet listing automatically and shows a toast with the interpretation
+- Graceful error fallback with a usage hint
+
+✅ **AI Adoption Assistant (`AdoptionAIChat.tsx`)**
+- Replaces the static adoption application form with a conversational AI flow
+- Launched from `PetDetail` page when a user clicks "Adopt"
+- Collects required fields (fullName, email, phone, address, reason) and optional fields (homeType, hasYard, otherPets, experience) through friendly multi-turn chat
+- Powered by `POST /api/ai/adoption-assist` using Gemini (multi-turn `startChat` with chat history)
+- Backend signals completion by embedding `FORM_DATA:{...}` in its response
+- On completion the extracted JSON is passed to the existing adoption form submit handler
 
 ---
 
@@ -760,6 +734,71 @@ Response: {
 }
 ```
 
+### AI Endpoints
+
+#### POST `/api/ai/search`
+Translate a natural language query into structured pet filters. **Public.**
+```typescript
+Body: {
+  query: string;  // e.g. "female dog under 2 years"
+}
+Response: {
+  success: true;
+  data: {
+    filters: {
+      species?: "dog" | "cat" | "bird" | "rabbit" | "other" | null;
+      gender?: "male" | "female" | "unknown" | null;
+      maxAge?: number | null;   // in months
+      minAge?: number | null;   // in months
+      breed?: string | null;
+      search?: string | null;
+    };
+    interpretation: string;   // Human-readable summary e.g. "Searching for: female, dog, under 2 year(s)"
+  };
+}
+```
+
+**Notes:**
+- Uses Gemini (`gemini-3.5-flash`) to extract filters from free-text input
+- Returns `null` for fields not mentioned in the query
+- Age shortcuts: "puppy"/"kitten" → `maxAge: 12`; "senior" → `minAge: 84`
+
+#### POST `/api/ai/adoption-assist`
+Run one turn of the AI adoption application conversation. **Public.**
+```typescript
+Body: {
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  petName: string;
+  petId: string;
+}
+Response: {
+  success: true;
+  data: {
+    message: string;       // AI reply to display in chat
+    isComplete: boolean;   // true when all required fields collected
+    formData: {            // only populated when isComplete is true
+      fullName: string;
+      email: string;
+      phone: string;
+      address: string;
+      reason: string;
+      homeType?: string;
+      hasYard?: boolean;
+      otherPets?: string;
+      experience?: string;
+    } | null;
+  };
+}
+```
+
+**Notes:**
+- Uses Gemini (`gemini-3-flash-preview`) with multi-turn `startChat` history
+- Required fields: `fullName`, `email`, `phone`, `address`, `reason` (min 20 chars)
+- Optional fields: `homeType`, `hasYard`, `otherPets`, `experience`
+- Backend signals completion by embedding `FORM_DATA:{...}` JSON in the response text
+
+---
+
 ### Media Endpoints
 
 #### POST `/api/media/upload`
@@ -893,6 +932,10 @@ CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 CLOUDINARY_ENDPOINT=https://res.cloudinary.com/your_cloud_name/image/upload/media
+
+# Google Generative AI (Gemini) — for AI search and adoption assistant
+GEMINI_API_KEY_FOR_SEARCH=your_gemini_api_key_for_search
+GEMINI_API_KEY_FOR_ADOPTION_FORM=your_gemini_api_key_for_adoption_form
 ```
 
 **Client (.env in `/client`):**
@@ -1511,6 +1554,8 @@ Key design decisions:
 
 ### Planned Features
 - [ ] Email notifications for application status changes
+- [x] ~~AI-powered natural language pet search~~ *(shipped in v1.3.0)*
+- [x] ~~Conversational AI adoption form assistant~~ *(shipped in v1.3.0)*
 - [ ] Pet search with Algolia/Elasticsearch
 - [ ] Advanced filters (location, size, temperament)
 - [ ] Favorites/watchlist for pets
@@ -1558,7 +1603,28 @@ Gunjan Dalwadi
 
 ## Changelog
 
-### v1.2.0 (Current)
+### v1.3.0 (Current)
+- ✅ **AI-Powered Natural Language Pet Search**
+  - Rewrote `AIChatBox.tsx` as a floating "Search with AI" panel on the Pet Listing page
+  - Accepts free-text queries (e.g. "young female cat") and translates them to structured filters
+  - New `POST /api/ai/search` endpoint using Google Gemini (`gemini-3.5-flash`)
+  - Filters applied directly to server-side pet listing query; toast shows interpretation
+- ✅ **AI Adoption Application Assistant**
+  - New `AdoptionAIChat.tsx` component replacing static adoption form on `PetDetail`
+  - Conversational multi-turn chat collects all required and optional applicant fields
+  - New `POST /api/ai/adoption-assist` endpoint using Google Gemini (`gemini-3-flash-preview`) with full `startChat` history
+  - Backend embeds `FORM_DATA:{...}` signal to indicate form completion
+  - Collected data passed directly to the existing adoption submission handler
+- ✅ **Pet Grid & Pagination Components**
+  - Extracted `PetGrid.tsx` — responsive 4-column grid with skeleton loading and empty state
+  - Extracted `PetPagination.tsx` — smart pagination with ellipsis, prev/next buttons, disabled states
+  - `PetFilterPanel.tsx` now contains inline AI search field alongside manual filters
+- ✅ **Backend AI Route Layer**
+  - New `server/src/controllers/ai.controller.ts` with `naturalLanguageSearch` and `adoptionAssistant`
+  - New `server/src/routes/ai.routes.ts` mounted at `/api/ai`
+  - Added `@google/generative-ai` dependency to server `package.json`
+
+### v1.2.0
 - ✅ **Image Upload & Management System**
   - Integrated Cloudinary for cloud-based image storage
   - Created `media` and `pet_media` database tables

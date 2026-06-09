@@ -2,6 +2,7 @@ import cors from "cors";
 import "dotenv/config";
 import express, { NextFunction, Request, Response } from "express";
 import adoptionRoutes from "./routes/adoption.routes";
+import aiRoutes from "./routes/ai.routes";
 import authRoutes from "./routes/auth.routes";
 import petRoutes from "./routes/pet.routes";
 import uploadRoutes from "./routes/upload.route";
@@ -41,6 +42,7 @@ app.use("/api/auth",      authRoutes);
 app.use("/api/pets",      petRoutes);
 app.use("/api/adoptions", adoptionRoutes);
 app.use("/api/media", uploadRoutes);
+app.use("/api/ai", aiRoutes);
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {

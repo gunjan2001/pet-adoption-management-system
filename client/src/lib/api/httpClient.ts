@@ -8,7 +8,7 @@ import axios from "axios";
 
 /** 5xx codes that indicate a transient infra/DB error (e.g. NeonDB cold-start). */
 const RETRYABLE_STATUS_CODES = new Set([500, 502, 503, 504]);
-
+const NON_RETRYABLE_URLS = ['/ai/adoption-assist', '/ai/search'];
 /**
  * Axios error codes that indicate a cold NeonDB / slow-starting Render dyno
  * rather than a real application error:
@@ -123,7 +123,11 @@ api.interceptors.response.use(
     //
     const isRetryableStatus = status !== undefined && RETRYABLE_STATUS_CODES.has(status);
     const isRetryableCode   = code !== undefined   && RETRYABLE_ERROR_CODES.has(code);
-    if (config && (isRetryableStatus || isRetryableCode) && !config._hasBeenRetried) {
+   const isAiRoute = config?.url 
+  ? NON_RETRYABLE_URLS.some(u => config.url!.includes(u)) 
+  : false;
+
+if (config && (isRetryableStatus || isRetryableCode) && !config._hasBeenRetried && !isAiRoute) {
       config._hasBeenRetried = true;
 
       console.warn(
@@ -160,3 +164,26 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+export const aiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { "Content-Type": "application/json" },
+  timeout: 30_000, // AI calls need more time than regular API calls
+});
+
+aiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// No retry interceptor — AI calls fail fast
+aiClient.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    console.error("AI API Error:", error.response?.status, error.response?.data);
+    return Promise.reject(error);
+  }
+);
