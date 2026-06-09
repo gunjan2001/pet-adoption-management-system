@@ -5,9 +5,9 @@ import { Request, Response } from "express";
 // Temp fix for corporate SSL — remove before deploying
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export const naturalLanguageSearch = async (req: Request, res: Response) => {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY_FOR_SEARCH!);
   const { query } = req.body;
 
   if (!query || typeof query !== "string") {
@@ -68,3 +68,95 @@ function buildInterpretation(filters: Record<string, any>): string {
   if (filters.minAge) parts.push(`over ${filters.minAge / 12} year(s)`);
   return parts.length ? parts.join(", ") : "all pets";
 }
+
+export const adoptionAssistant = async (req: Request, res: Response) => {
+  const { messages, petName, petId } = req.body;
+
+  if (!messages || !petName) {
+    return res.status(400).json({ success: false, message: "Missing required fields" });
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY_FOR_ADOPTION_FORM!);
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+    const systemPrompt = `You are a friendly pet adoption assistant helping someone adopt ${petName}.
+
+Your job is to collect this information through natural conversation:
+REQUIRED: fullName, email, phone, address, reason (why they want to adopt ${petName}, min 20 chars)
+OPTIONAL: homeType (house/apartment/condo/townhouse/other), hasYard (true/false), otherPets, experience
+
+Rules:
+- Ask 1-2 fields at a time, naturally. Don't list all questions at once.
+- Be warm and conversational, not robotic.
+- When you have collected ALL required fields, output EXACTLY this JSON block on its own line:
+  FORM_DATA:{"fullName":"...","email":"...","phone":"...","address":"...","reason":"...","homeType":"...","hasYard":true/false,"otherPets":"...","experience":"..."}
+- Only output FORM_DATA when all required fields (fullName, email, phone, address, reason) are confirmed.
+- If a required field is missing or unclear, ask for it before outputting FORM_DATA.
+- Keep responses concise — max 3 sentences per reply.
+- Start by greeting them and asking for their name and email together.`;
+
+      // Separate the last user message from history
+const lastMessage = messages[messages.length - 1].content;
+
+// Everything except the last message becomes history
+// Skip the very first user message ("I want to adopt X") — 
+// that's already baked into the system prompt context
+const priorMessages = messages.slice(1, -1); 
+
+// Build alternating history from prior messages
+const chatHistory = priorMessages.map((m: { role: string; content: string }) => ({
+  role: m.role === "assistant" ? "model" : "user",
+  parts: [{ text: m.content }],
+}));
+
+const chat = model.startChat({
+  history: [
+    // System context — always first as user→model pair
+    { role: "user", parts: [{ text: systemPrompt }] },
+    {
+      role: "model",
+      parts: [{ text: `Understood! I'll warmly guide this person through adopting ${petName}.` }],
+    },
+    // Prior conversation turns (already alternating since we skip first user msg)
+    ...chatHistory,
+  ],
+});
+
+const result = await chat.sendMessage(lastMessage);
+const responseText = result.response.text();
+
+    // Check if AI has collected all data
+    const formDataMatch = responseText.match(/FORM_DATA:(\{.*\})/);
+    
+    if (formDataMatch) {
+      try {
+        const formData = JSON.parse(formDataMatch[1]);
+        return res.json({
+          success: true,
+          data: {
+            message: responseText.replace(/FORM_DATA:\{.*\}/, "").trim() || 
+              `I've collected all the information needed. Ready to submit your application for ${petName}!`,
+            isComplete: true,
+            formData,
+          },
+        });
+      } catch {
+        // JSON parse failed, continue conversation
+        console.error("Failed to parse FORM_DATA JSON");
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        message: responseText,
+        isComplete: false,
+        formData: null,
+      },
+    });
+  } catch (error) {
+    console.error("Adoption assistant error:", error);
+    return res.status(500).json({ success: false, message: "AI assistant failed" });
+  }
+};
