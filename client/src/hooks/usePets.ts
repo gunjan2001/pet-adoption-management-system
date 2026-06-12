@@ -70,6 +70,8 @@ export const usePets = (filters: PetFilters = {}): UsePetsResult => {
         hasData.current = true;
       })
       .catch((err: unknown) => {
+        // Silently ignore request cancellations (AbortController / axios CancelToken)
+        if ((err as any)?.name === "CanceledError" || (err as any)?.code === "ERR_CANCELED") return;
         console.error("usePets fetch error:", err);
         setError((err as any)?.response?.data?.message ?? "Failed to load pets");
       })

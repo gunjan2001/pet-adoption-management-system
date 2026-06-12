@@ -15,6 +15,27 @@ on:
         default: true
 
 jobs:
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Test backend
+        run: |
+          cd server
+          npm ci
+          npm run test:coverage
+
+      - name: Test frontend
+        run: |
+          cd client
+          npm ci
+          npm run test:coverage
   # ── Job 1: Deploy Backend ───────────────────────────────────────────────────
   deploy-backend:
     name: Deploy Backend to Render
@@ -61,21 +82,7 @@ jobs:
           sleep 60
 
   # ── Job 2: Deploy Frontend ──────────────────────────────────────────────────
-  #
-  # THE FIX: `always()` must wrap the entire if condition at the JOB level.
-  #
-  # GitHub Actions behaviour:
-  #   - If a job in `needs` is SKIPPED, all dependent jobs are also auto-skipped
-  #     UNLESS the job's `if` condition explicitly starts with `always()`.
-  #   - `always()` tells GitHub: "evaluate my `if` regardless of needs status".
-  #   - Without it, selecting frontend-only skips this job because deploy-backend
-  #     was skipped, even if inputs.deploy_frontend is true.
-  #
-  # Scenarios:
-  #   Backend + Frontend → backend runs first, frontend waits via `needs`
-  #   Backend only       → deploy-frontend if=false, job skipped cleanly
-  #   Frontend only      → deploy-backend skipped, but always() lets this run
-  #
+
   deploy-frontend:
     name: Deploy Frontend to Vercel
     if: ${{ always() && inputs.deploy_frontend }}
