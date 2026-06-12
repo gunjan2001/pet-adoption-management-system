@@ -58,13 +58,12 @@ jobs:
           echo "⚠️  Linting not configured yet"
         continue-on-error: true
 
-      - name: Run tests (if any)
+      - name: Run tests
         run: |
           cd server
-          # If you have tests:
-          # npm test
-          echo "⚠️  Tests not configured yet"
-        continue-on-error: true
+          echo "🧪 Running backend tests..."
+          npm test -- --no-coverage
+          echo "✅ All backend tests passed"
 
   # Job 2: Lint and type-check frontend
   frontend-checks:
@@ -114,13 +113,12 @@ jobs:
           echo "⚠️  Linting not configured yet"
         continue-on-error: true
 
-      - name: Run tests (if any)
+      - name: Run tests
         run: |
           cd client
-          # If you have tests:
-          # npm test
-          echo "⚠️  Tests not configured yet"
-        continue-on-error: true
+          echo "🧪 Running frontend tests..."
+          npx vitest run
+          echo "✅ All frontend tests passed"
 
   # Job 3: Security checks
   security-checks:
